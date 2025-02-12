@@ -65,9 +65,11 @@ dependencies:
 
   qr_scanner_overlay: ^0.0.2
   iconsax:
+  dotted_border: ^2.0.0
   camera: ^0.10.5+5
 #  google_mlkit_text_recognition: ^0.14.0
   google_mlkit_text_recognition: 0.13.0  # Use an older version
+  google_mlkit_object_detection: ^0.13.0
 
 
 dev_dependencies:

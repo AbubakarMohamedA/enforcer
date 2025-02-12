@@ -586,8 +586,6 @@ class _PenalizepromptOffLoadingPaymentState extends State<PenalizepromptOffLoadi
 
                                         }
                                       }
-
-
                                       return DropdownSearch<OffLoadingVehcleDatum>(
                                           mode: Mode.DIALOG,
                                           items: vehicleTypesData,

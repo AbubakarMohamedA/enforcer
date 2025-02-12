@@ -927,8 +927,9 @@ class ApiProvider {
     Response? result;
     try {
       result = await Dio().post(
-        url == null ?
-        Endpoints.PERMISSION_URL : "https://eportal.mombasa.go.ke/mobile/android/staff/checkAppPermission.php", // Replace with your actual endpoint
+        // url == null ?
+        // Endpoints.PERMISSION_URL : "https://eportal.mombasa.go.ke/mobile/android/staff/checkAppPermission.php", // Replace with your actual endpoint
+        "https://eportal.mombasa.go.ke/mobile/android/staff/checkAppPermission.php",
         options: Options(
           headers: {
             'Authorization': 'Bearer $token',
