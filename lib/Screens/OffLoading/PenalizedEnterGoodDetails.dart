@@ -5,6 +5,7 @@ import 'package:get/get_core/src/get_main.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:nb_utils/nb_utils.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 
 import '../../Api/api_provider.dart';
 import '../../Models/Offloading/getOffloadingItems.dart';
@@ -22,6 +23,7 @@ class PenalizedgoodDetailsAdd extends StatefulWidget {
   var clientPhone;
   var token;
   var penalty;
+  var capturedApplicationId;
 
   final Function? clearPromptPageCallback;
   final Function? CheckPaymentDialogCallback;
@@ -40,6 +42,7 @@ class PenalizedgoodDetailsAdd extends StatefulWidget {
     required this.clientName,
     required this.clientPhone,
     required this.token,
+    required this.capturedApplicationId,
 
     required this.clearPromptPageCallback,
     required this.CheckPaymentDialogCallback,
@@ -1130,111 +1133,7 @@ class _PenalizedgoodDetailsAddState extends State<PenalizedgoodDetailsAdd> {
                       borderRadius: BorderRadius.circular(8.0),
                     ),
                     child: ElevatedButton(
-                      onPressed: () async {
-                        if(selectedProductsList.isEmpty){
-                          Get.snackbar(
-                            'Oops',
-                            'Please Add Products First',
-                            backgroundColor: Colors.redAccent.withOpacity(0.7),
-                            colorText: Colors.white,
-                            snackPosition: SnackPosition.TOP, // Adjust position if needed
-                            duration: Duration(seconds: 2), // Adjust duration if needed
-                            margin: EdgeInsets.only(left: 16.0,right: 16), // Adjust margin if needed
-                            borderRadius: 10.0, // Adjust border radius if needed
-                          );
-                        }else  if(isChecked == false){
-                          Get.snackbar(
-                            'Oops',
-                            'Please Accept Declaration First',
-                            backgroundColor: Colors.redAccent.withOpacity(0.7),
-                            colorText: Colors.white,
-                            snackPosition: SnackPosition.TOP, // Adjust position if needed
-                            duration: Duration(seconds: 2), // Adjust duration if needed
-                            margin: EdgeInsets.only(left: 16.0,right: 16), // Adjust margin if needed
-                            borderRadius: 10.0, // Adjust border radius if needed
-                          );
-                        } else{
-                          setState(() {
-                            isLoading = true;
-                          });
-                          List<Map<String, dynamic>> postData =
-                          selectedProductsList.map((product) {
-                            return {
-                              'id': product.itemChosen!.itemId,
-                              // 'amount': product.Amount,
-                              'amount': product.itemChosen!.rate,
-                              'quantity': product.quantity
-                            };
-                          }).toList();
-
-                          // Step 1: Remove commas
-                          String cleanedPenalty = widget.penalty.replaceAll(',', '');
-                          // Step 2: Remove decimals
-                          cleanedPenalty = cleanedPenalty.split('.')[0];
-                          // Step 3: Parse the cleaned string into an integer
-                          int number = int.parse(cleanedPenalty);
-
-                          print(number); // Output: 6000
-
-
-                          await ApiProvider()
-                              .postOffloadingItems(
-                              clientName: widget.clientName,
-                              clientPhone: widget.clientPhone,
-                              plateNumber: widget.plateNumber,
-                              vehicleType: widget.vehicleType,
-                              zone: widget.zoneId,
-                              token: widget.token,
-                              items: postData,
-                              penalty: number)
-                              .then((value) async {
-                            setState(() {
-                              isLoading = false;
-                              // widget.offLoadingCallback?.call();
-                            });
-                            if(value['status'] == "success"){
-                              Navigator.of(context).pop();
-                              Navigator.of(context).pop();
-                              if (widget.navigateBackAgain == 'Thrice') {
-                                Navigator.of(context).pop();
-                              }
-                              if (widget.navigateBackAgain == 'Four') {
-                                Navigator.of(context).pop();
-                                Navigator.of(context).pop();
-                              }
-                              widget.CheckPaymentDialogCallback!(trackingId: value['tracking_id']);
-                            }else{
-                              showDialog(
-                                  context: context,
-                                  builder: (ctx) {
-                                    return FailedDialog(
-                                        message:
-                                        value['message']
-                                            .toString()
-                                            .replaceAll("[", "")
-                                            .replaceAll("]", ""));
-                                  });
-                            }
-                          }).catchError((onError) {
-                            setState(() {
-                              isLoading = false;
-                            });
-
-                            debugPrint('Error: ${onError.toString()}');
-                            showDialog(
-                                context: context,
-                                builder: (ctx) {
-                                  return FailedDialog(
-                                    // dialogLotti:
-                                    // 'assets/lotti/success.json',
-                                      message:   '${onError.toString()}'
-                                          .toString()
-                                          .replaceAll("[", "")
-                                          .replaceAll("]", ""));
-                                });
-                          });
-                        }
-                      },
+                      onPressed: _submitForm,
                       style: ButtonStyle(
                         shape: MaterialStateProperty.all<RoundedRectangleBorder>(
                           RoundedRectangleBorder(
@@ -1352,8 +1251,208 @@ class _PenalizedgoodDetailsAddState extends State<PenalizedgoodDetailsAdd> {
 
     );
   }
-}
+  void _submitForm() async {
+    if(selectedProductsList.isEmpty){
+      Get.snackbar(
+        'Oops',
+        'Please Add Products First',
+        backgroundColor: Colors.redAccent.withOpacity(0.7),
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        duration: Duration(seconds: 2),
+        margin: EdgeInsets.only(left: 16.0,right: 16),
+        borderRadius: 10.0,
+      );
+    }else  if(isChecked == false){
+      Get.snackbar(
+        'Oops',
+        'Please Accept Declaration First',
+        backgroundColor: Colors.redAccent.withOpacity(0.7),
+        colorText: Colors.white,
+        snackPosition: SnackPosition.TOP,
+        duration: Duration(seconds: 2),
+        margin: EdgeInsets.only(left: 16.0,right: 16),
+        borderRadius: 10.0,
+      );
+    } else {
+      setState(() {
+        isLoading = true;
+      });
+      List<Map<String, dynamic>> postData =
+      selectedProductsList.map((product) {
+        return {
+          'id': product.itemChosen!.itemId,
+          'amount': product.itemChosen!.rate,
+          'quantity': product.quantity
+        };
+      }).toList();
 
+      String cleanedPenalty = widget.penalty.replaceAll(',', '');
+      cleanedPenalty = cleanedPenalty.split('.')[0];
+      int number = int.parse(cleanedPenalty);
+
+      await ApiProvider()
+          .postOffloadingItems(
+          clientName: widget.clientName,
+          clientPhone: widget.clientPhone,
+          plateNumber: widget.plateNumber,
+          vehicleType: widget.vehicleType,
+          zone: widget.zoneId,
+          token: widget.token,
+          items: postData,
+          penalty: number)
+          .then((value) async {
+        setState(() {
+          isLoading = false;
+        });
+        if(value['status'] == "success"){
+          Navigator.of(context).pop();
+          Navigator.of(context).pop();
+          if (widget.navigateBackAgain == 'Thrice') {
+            Navigator.of(context).pop();
+          }
+          if (widget.navigateBackAgain == 'Four') {
+            Navigator.of(context).pop();
+            Navigator.of(context).pop();
+          }
+
+          var responseData = value['data'] ?? value;
+          print('DEBUG PenalizedEnterGoodDetails postOffloadingItems response: $value');
+          print('DEBUG responseData: $responseData');
+          String? newAppId = responseData['application_id']?.toString()
+              ?? responseData['id']?.toString()
+              ?? responseData['applicationId']?.toString()
+              ?? value['application_id']?.toString()
+              ?? value['id']?.toString()
+              ?? (widget.capturedApplicationId != null && widget.capturedApplicationId.toString() != '0' ? widget.capturedApplicationId.toString() : null);
+          print('DEBUG newAppId: $newAppId');
+          widget.CheckPaymentDialogCallback!(
+            trackingId: value['tracking_id'].toString(),
+            applicationId: newAppId,
+            clientPhone: widget.clientPhone,
+            plateNumber: widget.plateNumber,
+            resubmitCallback: (String newPhone) {
+              if (mounted) {
+                setState(() {
+                  widget.clientPhone = newPhone;
+                });
+                _submitForm();
+              }
+            },
+          );
+        }else{
+          _showRetrySubmitPhoneDialog(value['message'].toString().replaceAll("[", "").replaceAll("]", ""));
+        }
+      }).catchError((onError) {
+        setState(() {
+          isLoading = false;
+        });
+        debugPrint('Error: ${onError.toString()}');
+        _showRetrySubmitPhoneDialog(onError.toString().replaceAll("[", "").replaceAll("]", ""));
+      });
+    }
+  }
+
+  Future<void> _showRetrySubmitPhoneDialog(String errorMessage) async {
+    bool _isValidNumber = true; // assume true initially or let user correct it
+    String _fullPhoneNumber = widget.clientPhone ?? '';
+
+    bool? confirmPrompt = await showDialog<bool>(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext context) {
+        TextEditingController phoneNumberController = TextEditingController(text: widget.clientPhone);
+        PhoneNumber _initialPhoneNumber = PhoneNumber(phoneNumber: widget.clientPhone, isoCode: 'KE');
+        double fontSize = MediaQuery.of(context).size.width / 28.0;
+
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(child: Text("Payment Initialization Failed", style: GoogleFonts.manrope(fontSize: fontSize * 1.1, fontWeight: FontWeight.bold, color: Colors.red))),
+                  SizedBox(height: 8),
+                  Center(child: Text(errorMessage, style: GoogleFonts.manrope(fontSize: fontSize * 0.9, color: Colors.black87), textAlign: TextAlign.center)),
+                  SizedBox(height: 15),
+                  Center(child: Text("Please confirm or edit the client's phone number to retry:", style: GoogleFonts.manrope(fontSize: fontSize * 1))),
+                  SizedBox(height: 15),
+                  InternationalPhoneNumberInput(
+                    countries: ["KE"],
+                    onInputChanged: (PhoneNumber number) {
+                      _fullPhoneNumber = number.phoneNumber ?? '';
+                    },
+                    onInputValidated: (isValid) {
+                      setStateDialog(() {
+                        _isValidNumber = isValid;
+                      });
+                    },
+                    textStyle: GoogleFonts.manrope(),
+                    selectorButtonOnErrorPadding: 2,
+                    selectorConfig: SelectorConfig(
+                      selectorType: PhoneInputSelectorType.DROPDOWN,
+                      setSelectorButtonAsPrefixIcon: true,
+                      trailingSpace: true,
+                      useEmoji: true,
+                      leadingPadding: 20,
+                    ),
+                    ignoreBlank: true,
+                    autoValidateMode: AutovalidateMode.onUserInteraction,
+                    spaceBetweenSelectorAndTextField: 25,
+                    selectorTextStyle: GoogleFonts.manrope(),
+                    initialValue: _initialPhoneNumber,
+                    textFieldController: phoneNumberController,
+                    formatInput: true,
+                    errorMessage: 'Please enter a valid phone number',
+                    inputDecoration: InputDecoration(
+                      prefixIconColor: Colors.black38,
+                      hintStyle: GoogleFonts.manrope(fontSize: fontSize),
+                      hintText: '712-256-408',
+                      alignLabelWithHint: false,
+                      fillColor: Colors.white,
+                      filled: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Color(0xFF46B1FD))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Color(0xFF46B1FD))),
+                    ),
+                    keyboardType: TextInputType.numberWithOptions(signed: true, decimal: true),
+                    inputBorder: OutlineInputBorder(),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: TextButton.styleFrom(backgroundColor: Colors.red, padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0)),
+                  child: Text("Cancel", style: GoogleFonts.montserrat(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w400)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (_isValidNumber) {
+                      Navigator.of(context).pop(true);
+                    } else {
+                       Get.snackbar('Oops', 'Invalid Phone Number', backgroundColor: Colors.redAccent.withOpacity(0.7), colorText: Colors.white, snackPosition: SnackPosition.TOP, duration: Duration(seconds: 2), margin: EdgeInsets.only(left: 16.0, right: 16), borderRadius: 10.0);
+                    }
+                  },
+                  style: TextButton.styleFrom(backgroundColor: Colors.green, padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0)),
+                  child: Text("Retry Request", style: GoogleFonts.montserrat(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w400)),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
+
+    if (confirmPrompt == true) {
+      if (mounted) {
+        setState(() {
+          widget.clientPhone = _fullPhoneNumber;
+        });
+        _submitForm();
+      }
+    }
+  }
+}
 
 class selectedProduct {
 
@@ -1367,8 +1466,6 @@ class selectedProduct {
     required this.itemChosen
   });
 }
-
-
 
 class PaidGoodsItem extends StatefulWidget {
   PaidGoodsItem({

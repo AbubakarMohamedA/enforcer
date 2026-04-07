@@ -28,6 +28,7 @@ class PenalizepromptOffLoadingPayment extends StatefulWidget {
   var capturedPlate;
   var capturedClientName;
   var capturedPhone;
+  var capturedApplicationId;
 
 
   PenalizepromptOffLoadingPayment({
@@ -39,7 +40,8 @@ class PenalizepromptOffLoadingPayment extends StatefulWidget {
     required this.capturedVehicleType,
     required this.capturedPlate,
     required this.capturedClientName,
-    required this.capturedPhone
+    required this.capturedPhone,
+    this.capturedApplicationId
 
   });
 
@@ -943,6 +945,7 @@ class _PenalizepromptOffLoadingPaymentState extends State<PenalizepromptOffLoadi
                                         clientPhone: _fullPhoneNumber,
                                         token: widget.token,
                                         penalty: _penaltyController.text,
+                                        capturedApplicationId: widget.capturedApplicationId,
 
 
                                         clearPromptPageCallback: clearPromptPageData,

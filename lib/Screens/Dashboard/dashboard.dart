@@ -30,6 +30,7 @@ import '../Psv/psv.dart';
 import '../Traffic_Offense/traffic.dart';
 import '../appDrawer.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 
 
@@ -48,8 +49,9 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
   double? percentage = 0;
 
   Future<void> _checkVersionAndLoadDetails() async {
-    // Retrieve current app version
-    String currentVersion = "1.0.2";
+    // Retrieve current app version dynamically
+    PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    String currentVersion = packageInfo.version;
     print("The package version is: ${currentVersion}");
 
     try {
@@ -67,12 +69,11 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
       await remoteConfig.fetchAndActivate();
 
       // Get latest version from Remote Config
-      String latestVersion = remoteConfig.getString('prod_ios_live');  //IOS VERSION
-      // String latestVersion = remoteConfig.getString('latest_playstore_version');
+      String latestVersion = remoteConfig.getString('latest_playstore_version'); // ANDROID VERSION
       print("The latest version from Remote Config is: ${latestVersion}");
 
       // Compare versions
-      if (currentVersion != latestVersion) {
+      if (latestVersion.isNotEmpty && currentVersion != latestVersion) {
         // Prompt user to update app
         if (mounted) {
           _showUpdatePrompt();

@@ -251,7 +251,11 @@ class _DailyoffLoadingDetailsState extends State<DailyoffLoadingDetails> {
                     // Navigator.of(context).pop();
                     Navigator.pop(context);
                     Navigator.pop(context);
-                    widget.CheckPaymentDialogCallback!(trackingId: value['tracking_id'].toString());
+                    widget.CheckPaymentDialogCallback!(
+                      trackingId: value['tracking_id'].toString(),
+                      applicationId: widget.offLoadingItem.id.toString(),
+                      clientPhone: _fullPhoneNumber,
+                    );
 
                 } else {
                   showDialog(

@@ -120,8 +120,9 @@ class _offBoardingDetailsState extends State<offBoardingDetails> {
                             capturedVehicleId: widget.lastApplication?.data?.vehicleId,
                             capturedPlate: widget.lastApplication?.data?.plateNo,
                             capturedClientName: widget.lastApplication?.data?.citizenName,
-                            capturedPhone: widget.lastApplication?.data?.citizenMobile,
-                          )));
+                             capturedPhone: widget.lastApplication?.data?.citizenMobile,
+                             capturedApplicationId: widget.lastApplication?.data?.applicationId,
+                           )));
             },
           ),
           // if(widget.lastApplication.status == "Unpaid")
@@ -148,6 +149,7 @@ class _offBoardingDetailsState extends State<offBoardingDetails> {
                             capturedVehicleId: widget.lastApplication?.data?.vehicleId,
                             capturedClientName: widget.lastApplication?.data?.citizenName,
                             capturedPhone: widget.lastApplication?.data?.citizenMobile,
+                            capturedApplicationId: widget.lastApplication?.data?.applicationId,
                           )));
               // Add your onTap logic here
             },

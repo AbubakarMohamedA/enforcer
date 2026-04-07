@@ -15,6 +15,8 @@ import 'Authentication/changePassword.dart';
 import 'Authentication/loginScreen.dart';
 import 'Dashboard/dashboard.dart';
 import 'Profile/profile.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
 
 
 class AppDrawer extends StatefulWidget {
@@ -37,6 +39,15 @@ class _AppDrawerState extends State<AppDrawer> with SingleTickerProviderStateMix
   // static const dragRightStartVal = 60;
   // static const dragLeftStartVal = maxSlide - 20;
   static bool shouldDrag = false;
+  String _appVersion = 'Loading...';
+
+  Future<void> _initPackageInfo() async {
+    final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+    setState(() {
+      _appVersion = packageInfo.version;
+    });
+  }
+
 
   @override
   void initState() {
@@ -587,13 +598,14 @@ class CustomDrawer extends StatelessWidget {
                         ),
                         children: <TextSpan>[
                           TextSpan(
-                            text: '1.0.1',
+                            text: (context.findAncestorStateOfType<_AppDrawerState>()?._appVersion ?? '1.0.4'),
                             style: GoogleFonts.manrope(
                               fontSize: fontSize * 0.9,
                               color: Colors.black,
                             ),
                           ),
                         ],
+
                       ),
                     ),
                   ),

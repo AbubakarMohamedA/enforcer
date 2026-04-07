@@ -1,8 +1,8 @@
 class Endpoints {
   // Main URL
   // static const String MAIN_URL = "https://demo.techbizafrica.com/mcp/mobile/android/hawkers/index.php"; // demo server]
-  static const String MAIN_URL = "https://demo.techbizafrica.com/mcp/mobile/android/";
-  // static const String MAIN_URL = "https://eportal.mombasa.go.ke/mobile/android/"; // prod server
+  // static const String MAIN_URL = "https://demo.techbizafrica.com/mcp/mobile/android/";
+  static const String MAIN_URL = "https://eportal.mombasa.go.ke/mobile/android/"; // prod server
 
   // Versioning URL
   static const String VERSION_URL = "${MAIN_URL}staff/vcs_staff.php";

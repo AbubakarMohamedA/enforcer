@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:nb_utils/nb_utils.dart';
 
-import '../../api/api_provider.dart';
+import '../../Api/api_provider.dart';
 import '../../widgets/failed_dialog.dart';
 import '../../widgets/sucess-dialog.dart';
 

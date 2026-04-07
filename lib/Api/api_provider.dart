@@ -46,6 +46,7 @@ class ApiProvider {
         "https://eportal.mombasa.go.ke/mobile/android/staff/loginV2.php",
         // Endpoints.LOGIN_URL, // Replace with your actual endpoint
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Content-Type': 'application/json', // Set content type to JSON
           },
@@ -285,6 +286,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -339,6 +341,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -393,6 +396,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -497,6 +501,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -550,6 +555,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -615,6 +621,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -666,6 +673,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -720,6 +728,7 @@ class ApiProvider {
              "plateNumber" : plateNumber
            },
            options: Options(
+             preserveHeaderCase: true,
              contentType: Headers.jsonContentType,
              headers: {
                'Authorization': 'Bearer ${token}',
@@ -771,6 +780,7 @@ class ApiProvider {
               "appType" : "getTasks"
             },
             options: Options(
+              preserveHeaderCase: true,
               contentType: Headers.jsonContentType,
               headers: {
                 'Authorization': 'Bearer ${token}',
@@ -830,6 +840,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -931,6 +942,7 @@ class ApiProvider {
         // Endpoints.PERMISSION_URL : "https://eportal.mombasa.go.ke/mobile/android/staff/checkAppPermission.php", // Replace with your actual endpoint
         "https://eportal.mombasa.go.ke/mobile/android/staff/checkAppPermission.php",
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON
@@ -991,6 +1003,7 @@ class ApiProvider {
           'appType' : 'getZones'
         },
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON
@@ -1051,6 +1064,7 @@ class ApiProvider {
           'appType' : 'getVehicleTypes'
         },
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON
@@ -1111,6 +1125,7 @@ class ApiProvider {
           'appType' : 'getItems'
         },
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON
@@ -1188,6 +1203,7 @@ class ApiProvider {
           "penalty" : penalty
         },
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON
@@ -1247,6 +1263,7 @@ class ApiProvider {
           "clientPhoneNumber" : clientPhone,
         },
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON
@@ -1305,6 +1322,7 @@ class ApiProvider {
           // 'converted_to_order' : "True"
         },
         options: Options(
+          preserveHeaderCase: true,
           contentType: Headers.jsonContentType,
           headers: {
             'Authorization': 'Bearer ${token}',
@@ -1362,6 +1380,7 @@ class ApiProvider {
           'vehicleType' : vehicleType,
         },
         options: Options(
+          preserveHeaderCase: true,
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json', // Set content type to JSON

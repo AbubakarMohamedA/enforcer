@@ -5,11 +5,14 @@ import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lottie/lottie.dart';
+import 'package:get/get.dart';
+import 'package:intl_phone_number_input/intl_phone_number_input.dart';
 
 import 'package:shimmer/shimmer.dart';
 
 import '../../Models/Offloading/getLastCessMadeApplication.dart';
 import '../../Models/Offloading/getOffloadingStatsModel.dart';
+import '../../Models/Offloading/getDailyOffloadingApplications.dart';
 import '../../widgets/failed_dialog.dart';
 import '../../widgets/payment_dialog.dart';
 import 'off-loading-list.dart';
@@ -1268,6 +1271,7 @@ class _offBoardingState extends State<offBoarding> {
                                                                     capturedClientName: lastApplication?.data?.citizenName,
                                                                     capturedVehicleId: lastApplication?.data?.vehicleId,
                                                                     capturedPhone: lastApplication?.data?.citizenMobile,
+                                                                    capturedApplicationId: lastApplication?.data?.applicationId,
                                                                   )));
                                                     },
                                                     style: ButtonStyle(
@@ -1423,6 +1427,7 @@ class _offBoardingState extends State<offBoarding> {
                                                                   capturedPhone: null,
                                                                   capturedVehicleId: null,
                                                                   capturedOrigin: null,
+                                                                  capturedApplicationId: null,
                                                                 )));
                                                   },
                                                   style: ButtonStyle(
@@ -1485,7 +1490,12 @@ class _offBoardingState extends State<offBoarding> {
   }
 
   Future<void> CheckPaymentDialog({
-    trackingId
+    trackingId,
+    applicationId,
+    clientPhone,
+    String? plateNumber,
+    int promptCount = 1,
+    Function(String newPhone)? resubmitCallback,
   }) async {
     showDialog(
       barrierDismissible: false,
@@ -1499,12 +1509,67 @@ class _offBoardingState extends State<offBoarding> {
         );
       },
     );
-    // _showLoadingPayment("Initiated Payment. Please wait...............");
-    await _checkOffLoaidngPaymentStatusRepeatedly(trackingId:trackingId, );
+    await _checkOffLoaidngPaymentStatusRepeatedly(
+      trackingId: trackingId,
+      applicationId: applicationId,
+      clientPhone: clientPhone,
+      plateNumber: plateNumber,
+      promptCount: promptCount,
+      resubmitCallback: resubmitCallback,
+    );
+  }
+
+  Future<String?> _recoverApplicationId(String? plateNumber) async {
+    try {
+      if (plateNumber == null || plateNumber.isEmpty) return null;
+      print('DEBUG: Attempting to recover applicationId for plate: $plateNumber');
+
+      // Tier 1: Try the direct "last record" API
+      try {
+        GetVehicleLastPaymentCess lastApp = await ApiProvider().getLastpaymentCess(
+          token: widget.token,
+          plateNumber: plateNumber,
+        );
+        if (lastApp.status == "success" && lastApp.data != null) {
+          String? recoveredId = lastApp.data?.applicationId?.toString();
+          if (recoveredId != null && recoveredId != 'null' && recoveredId.isNotEmpty) {
+            print('DEBUG: Recovered applicationId from last record (Tier 1): $recoveredId');
+            return recoveredId;
+          }
+        }
+      } catch (e) {
+        print('DEBUG: Tier 1 recovery failed or no records: $e');
+      }
+
+      // Tier 2: Fallback to scanning the full daily applications list (Highest reliability)
+      print('DEBUG: Attempting Tier 2 recovery (List scan) for plate: $plateNumber');
+      GetDailyOffloadingApplications dailyApps = await ApiProvider().getDailyOffloadingApplications(
+        token: widget.token,
+      );
+
+      if (dailyApps.status == "success" && dailyApps.data != null) {
+        // Sort by ID descending to get the newest one first
+        dailyApps.data.sort((a, b) => b.id.compareTo(a.id));
+
+        // Find the first matching plate
+        final match = dailyApps.data.firstWhereOrNull(
+                (app) => app.plateNo?.toUpperCase() == plateNumber.toUpperCase()
+        );
+
+        if (match != null) {
+          String recoveredId = match.id.toString();
+          print('DEBUG: Recovered applicationId from list scan (Tier 2): $recoveredId');
+          return recoveredId;
+        }
+      }
+    } catch (e) {
+      print('DEBUG: All recovery tiers failed: $e');
+    }
+    return null;
   }
 
   Future<void> _checkOffLoaidngPaymentStatusRepeatedly(
-      {required String trackingId}
+      {required String trackingId, String? applicationId, String? clientPhone, String? plateNumber, int promptCount = 1, Function(String newPhone)? resubmitCallback}
       ) async {
     final startTime = DateTime.now();
     const timeout = Duration(seconds: 30);
@@ -1516,6 +1581,17 @@ class _offBoardingState extends State<offBoarding> {
         );
 
         if(checkstatus['status'] == "success"){
+          // Attempt to recover applicationId if it was missing
+          if ((applicationId == null || applicationId.toString() == 'null' || applicationId.toString().isEmpty)) {
+            String? recoveredId = checkstatus['application_id']?.toString()
+                ?? checkstatus['id']?.toString()
+                ?? checkstatus['applicationId']?.toString();
+            if (recoveredId != null && recoveredId != 'null' && recoveredId.isNotEmpty) {
+              applicationId = recoveredId;
+              print('DEBUG: Recovered applicationId from status check: $applicationId');
+            }
+          }
+
           if (checkstatus['data'] == "Completed") {
             setState(() {
               showcarPaid= false;
@@ -1526,6 +1602,30 @@ class _offBoardingState extends State<offBoarding> {
             _showSuccessDialog("Fee Payment Successfully Received");
             return;
           }
+
+          // If status is "Failed", handle retry
+          if (checkstatus['data'] == "Failed") {
+            setState(()  {
+              showcarPaid= false;
+              hasNoRecords = false;
+              offLoadingStatsFuture =  ApiProvider().getOffLoadingStats(token: widget.token);
+            });
+            Navigator.of(context).pop();
+
+            // Final attempt to recover ID from latest record if still missing
+            if (applicationId == null || applicationId.toString() == 'null' || applicationId.toString().isEmpty) {
+              applicationId = await _recoverApplicationId(plateNumber);
+            }
+
+            print('DEBUG retry: promptCount=$promptCount applicationId=$applicationId clientPhone=$clientPhone');
+            if (promptCount < 3 && clientPhone != null) {
+              _showRetryPhoneDialog(applicationId?.toString() ?? '', clientPhone, promptCount, resubmitCallback: resubmitCallback);
+            } else {
+              _showErrorDialog(checkstatus['message'] ?? "Payment Failed");
+            }
+            return;
+          }
+
           await Future.delayed(Duration(seconds: 5));
         }else{
           setState(()  {
@@ -1534,13 +1634,35 @@ class _offBoardingState extends State<offBoarding> {
             offLoadingStatsFuture =  ApiProvider().getOffLoadingStats(token: widget.token);
           });
           Navigator.of(context).pop();
-          _showErrorDialog(checkstatus['message']);
+
+          // Final attempt to recover ID from latest record if still missing
+          if (applicationId == null || applicationId.toString() == 'null' || applicationId.toString().isEmpty) {
+            applicationId = await _recoverApplicationId(plateNumber);
+          }
+
+          print('DEBUG error status retry: promptCount=$promptCount applicationId=$applicationId clientPhone=$clientPhone');
+          if (promptCount < 3 && clientPhone != null) {
+            _showRetryPhoneDialog(applicationId?.toString() ?? '', clientPhone, promptCount, resubmitCallback: resubmitCallback);
+          } else {
+            _showErrorDialog(checkstatus['message']);
+          }
           return;
         }
       } catch (e) {
         print('Error during status check: $e');
         Navigator.of(context).pop();
-        _showErrorDialog(e.toString());
+
+        // Final attempt to recover ID from latest record if still missing
+        if (applicationId == null || applicationId.toString() == 'null' || applicationId.toString().isEmpty) {
+          applicationId = await _recoverApplicationId(plateNumber);
+        }
+
+        print('DEBUG catch retry: promptCount=$promptCount applicationId=$applicationId clientPhone=$clientPhone');
+        if (promptCount < 3 && clientPhone != null) {
+          _showRetryPhoneDialog(applicationId?.toString() ?? '', clientPhone, promptCount, resubmitCallback: resubmitCallback);
+        } else {
+          _showErrorDialog(e.toString());
+        }
         return;
       }
     }
@@ -1550,7 +1672,149 @@ class _offBoardingState extends State<offBoarding> {
       offLoadingStatsFuture =  ApiProvider().getOffLoadingStats(token: widget.token);
     });
     Navigator.of(context).pop();
-    _showErrorDialog("Connection Timed Out Without payment Confirmation");
+
+    // Final attempt to recover ID from latest record if still missing
+    if (applicationId == null || applicationId.toString() == 'null' || applicationId.toString().isEmpty) {
+      applicationId = await _recoverApplicationId(plateNumber);
+    }
+
+    print('DEBUG timeout retry: promptCount=$promptCount applicationId=$applicationId clientPhone=$clientPhone');
+    if (promptCount < 3 && clientPhone != null) {
+      _showRetryPhoneDialog(applicationId?.toString() ?? '', clientPhone, promptCount, resubmitCallback: resubmitCallback);
+    } else {
+      _showErrorDialog("Connection Timed Out Without payment Confirmation");
+    }
+  }
+
+  Future<void> _showRetryPhoneDialog(String applicationId, String clientPhone, int promptCount, {Function(String newPhone)? resubmitCallback}) async {
+    bool _isValidNumber = true; // assume true initially or let user correct it
+    String _fullPhoneNumber = clientPhone;
+
+    bool? confirmPrompt = await showDialog<bool>(
+      barrierDismissible: false,
+      context: context,
+      builder: (BuildContext context) {
+        TextEditingController phoneNumberController = TextEditingController(text: clientPhone);
+        PhoneNumber _initialPhoneNumber = PhoneNumber(phoneNumber: clientPhone, isoCode: 'KE');
+        double fontSize = MediaQuery.of(context).size.width / 28.0;
+
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(child: Text("Confirm Phone Number", style: GoogleFonts.manrope(fontSize: fontSize * 1.2, fontWeight: FontWeight.w600))),
+                  SizedBox(height: 12),
+                  Center(child: Text("Please confirm or edit the client's phone number:", style: GoogleFonts.manrope(fontSize: fontSize * 1))),
+                  SizedBox(height: 15),
+                  InternationalPhoneNumberInput(
+                    countries: ["KE"],
+                    onInputChanged: (PhoneNumber number) {
+                      _fullPhoneNumber = number.phoneNumber ?? '';
+                    },
+                    onInputValidated: (isValid) {
+                      setStateDialog(() {
+                        _isValidNumber = isValid;
+                      });
+                    },
+                    textStyle: GoogleFonts.manrope(),
+                    selectorButtonOnErrorPadding: 2,
+                    selectorConfig: SelectorConfig(
+                      selectorType: PhoneInputSelectorType.DROPDOWN,
+                      setSelectorButtonAsPrefixIcon: true,
+                      trailingSpace: true,
+                      useEmoji: true,
+                      leadingPadding: 20,
+                    ),
+                    ignoreBlank: false,
+                    autoValidateMode: AutovalidateMode.onUserInteraction,
+                    spaceBetweenSelectorAndTextField: 25,
+                    selectorTextStyle: GoogleFonts.manrope(),
+                    initialValue: _initialPhoneNumber,
+                    textFieldController: phoneNumberController,
+                    formatInput: true,
+                    errorMessage: 'Please enter a valid phone number',
+                    inputDecoration: InputDecoration(
+                      prefixIconColor: Colors.black38,
+                      hintStyle: GoogleFonts.manrope(fontSize: fontSize),
+                      hintText: '712-256-408',
+                      alignLabelWithHint: false,
+                      fillColor: Colors.white,
+                      filled: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Color(0xFF46B1FD))),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: Color(0xFF46B1FD))),
+                    ),
+                    keyboardType: TextInputType.numberWithOptions(signed: true, decimal: true),
+                    inputBorder: OutlineInputBorder(),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  style: TextButton.styleFrom(backgroundColor: Colors.red, padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0)),
+                  child: Text("Cancel", style: GoogleFonts.montserrat(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w400)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (_isValidNumber) {
+                      Navigator.of(context).pop(true);
+                    } else {
+                       Get.snackbar('Oops', 'Invalid Phone Number', backgroundColor: Colors.redAccent.withOpacity(0.7), colorText: Colors.white, snackPosition: SnackPosition.TOP, duration: Duration(seconds: 2), margin: EdgeInsets.only(left: 16.0, right: 16), borderRadius: 10.0);
+                    }
+                  },
+                  style: TextButton.styleFrom(backgroundColor: Colors.green, padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0)),
+                  child: Text("Prompt", style: GoogleFonts.montserrat(fontSize: 13, color: Colors.white, fontWeight: FontWeight.w400)),
+                ),
+              ],
+            );
+          }
+        );
+      }
+    );
+
+    if (confirmPrompt == true) {
+      // If we have no applicationId (new application flow), use the resubmitCallback
+      // to re-create the application with the corrected phone number
+      if ((applicationId == null || applicationId.toString().isEmpty || applicationId.toString() == 'null') && resubmitCallback != null) {
+        resubmitCallback(_fullPhoneNumber);
+        return;
+      }
+
+      showDialog(
+        barrierDismissible: false,
+        context: context,
+        builder: (ctx) => WillPopScope(
+          onWillPop: () async => false,
+          child: paymentDialog(message: "Initiating Payment..."),
+        ),
+      );
+      try {
+        var value = await ApiProvider().promptPaymentOfSavedApplications(
+          token: widget.token,
+          applicationId: int.tryParse(applicationId.toString()) ?? 0,
+          clientPhone: _fullPhoneNumber,
+        );
+        Navigator.of(context).pop(); // pop the "Initiating Payment..." dialog
+        if (value['status'] == "success") {
+          CheckPaymentDialog(
+            trackingId: value['tracking_id'].toString(),
+            applicationId: applicationId,
+            clientPhone: _fullPhoneNumber,
+            promptCount: promptCount + 1,
+            resubmitCallback: resubmitCallback,
+          );
+        } else {
+          _showErrorDialog(value['message'].toString().replaceAll("[", "").replaceAll("]", ""));
+        }
+      } catch (e) {
+        Navigator.of(context).pop();
+        _showErrorDialog(e.toString().replaceAll("[", "").replaceAll("]", ""));
+      }
+    } else {
+       _showErrorDialog("Connection Timed Out Without payment Confirmation");
+    }
   }
 
   void _showErrorDialog(String message) {

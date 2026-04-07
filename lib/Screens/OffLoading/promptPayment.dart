@@ -21,6 +21,7 @@ class promptOffLoadingPayment extends StatefulWidget {
   var capturedOrigin;
   var capturedClientName;
   var capturedPhone;
+  var capturedApplicationId;
 
   promptOffLoadingPayment({
     required this.token,
@@ -30,7 +31,8 @@ class promptOffLoadingPayment extends StatefulWidget {
     required this.capturedOrigin,
     required this.capturedClientName,
     required this.capturedVehicleId,
-    required this.capturedPhone
+    required this.capturedPhone,
+    required this.capturedApplicationId
   });
 
   @override
@@ -804,6 +806,7 @@ class _promptOffLoadingPaymentState extends State<promptOffLoadingPayment> {
                                         token: widget.token,
 
                                         clearPromptPageCallback: clearPromptPageData,
+                                        capturedApplicationId: widget.capturedApplicationId,
                                         CheckPaymentDialogCallback: widget.CheckPaymentDialogCallback,
                                         navigateBackAgain: widget.navigateBackAgain,
                                       )));
