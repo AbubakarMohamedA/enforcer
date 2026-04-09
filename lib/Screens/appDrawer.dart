@@ -55,6 +55,7 @@ class _AppDrawerState extends State<AppDrawer> with SingleTickerProviderStateMix
     // Initialize values based on screen width
 
     _controller = AnimationController(vsync: this, duration: _AppDrawerState.duration);
+    _initPackageInfo(); 
   }
 
   void close() => _controller.reverse();
