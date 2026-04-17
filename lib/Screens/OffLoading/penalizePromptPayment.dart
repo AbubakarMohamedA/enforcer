@@ -411,7 +411,6 @@ class _PenalizepromptOffLoadingPaymentState extends State<PenalizepromptOffLoadi
                               children: [
 
                                 DropdownSearch<String>(
-                                  mode: Mode.DIALOG,
                                   items: origin, // List of Strings
                                   selectedItem: originSelected,
                                   dropdownSearchDecoration: InputDecoration(
@@ -1001,8 +1000,6 @@ class _PenalizepromptOffLoadingPaymentState extends State<PenalizepromptOffLoadi
   }
   Widget createDisabledDropdownSearch(String hintText, double fontSize) {
     return DropdownSearch<String>(
-      mode: Mode.MENU,
-      showSelectedItems: true,
       items: [],
       dropdownSearchDecoration: InputDecoration(
         disabledBorder: OutlineInputBorder(
@@ -1014,9 +1011,6 @@ class _PenalizepromptOffLoadingPaymentState extends State<PenalizepromptOffLoadi
         hintText: hintText,
         hintStyle: GoogleFonts.manrope(fontSize: fontSize),
       ),
-      onChanged: print,
-      maxHeight: 130,
-      popupBackgroundColor: Colors.grey[200],
       enabled: false,
     );
   }

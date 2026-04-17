@@ -12,31 +12,31 @@ import 'package:lottie/lottie.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:nb_utils/nb_utils.dart';
 import '../../Api/api_provider.dart';
-import '../../Models/HawkersModel/getHawkerStats.dart';
+import '../../Models/MarketEntryModel/getMarketStats.dart';
 import '../../Models/HawkersModel/getLocations.dart';
 import '../../Models/HawkersModel/getZones.dart';
-import '../../Models/HawkersModel/paidHawkers.dart';
+import '../../Models/MarketEntryModel/paidMarket.dart';
 import '../../error_page.dart';
 
-class paidHawkers extends StatefulWidget {
+class paidMarket extends StatefulWidget {
   var token;
-  paidHawkers({required this.token});
+  paidMarket({required this.token});
 
   @override
-  State<paidHawkers> createState() => _paidHawkersState();
+  State<paidMarket> createState() => _paidMarketState();
 }
 
-class _paidHawkersState extends State<paidHawkers>
+class _paidMarketState extends State<paidMarket>
     with SingleTickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    paidHawkersFuture = ApiProvider().getPaidHawkers(token: widget.token);
+    paidMarketFuture = ApiProvider().getPaidMarket(token: widget.token);
     zonesFuture  =  ApiProvider().getZones(token: widget.token);
   }
 
-  Future<PaidHawkers>? paidHawkersFuture;
-  List<PaidHawkersDatum>? paidHawkersList;
+  Future<PaidMarket>? paidMarketFuture;
+  List<PaidMarketDatum>? paidMarketList;
 
 
   late Future<GetZones> zonesFuture;
@@ -44,9 +44,9 @@ class _paidHawkersState extends State<paidHawkers>
 
 
   final _formKey = GlobalKey<FormState>();
-  TextEditingController _hawkerIdController = TextEditingController();
-  TextEditingController _hawkerNameController = TextEditingController();
-  String? hawkerZoneId;
+  TextEditingController _marketIdController = TextEditingController();
+  TextEditingController _marketNameController = TextEditingController();
+  String? marketZoneId;
   bool zoneSelected = false;
 
   Datum? selectedZone;
@@ -63,10 +63,10 @@ class _paidHawkersState extends State<paidHawkers>
   List<LocationsDatum>? AllLocationsData;
   LocationsDatum? selectedDropdownLocation;
   List<LocationsDatum>? speicifcLocationsData;
-  Future<GetLocations> loadLocations(hawkerZoneId) async {
+  Future<GetLocations> loadLocations(marketZoneId) async {
     try {
       locationsFuture =  ApiProvider()
-          .getLocations(token: widget.token, zoneId: hawkerZoneId);
+          .getLocations(token: widget.token, zoneId: marketZoneId);
       // Sort the list in descending order based on the apply date
       return locationsFuture;
     } catch (e) {
@@ -81,7 +81,7 @@ class _paidHawkersState extends State<paidHawkers>
 
   bool _isFiltering = false;
   bool _isReseting = false;
-  List<PaidHawkersDatum>? filteredPaidHawkers;
+  List<PaidMarketDatum>? filteredPaidMarket;
 
 
   List<String> location = [
@@ -91,7 +91,7 @@ class _paidHawkersState extends State<paidHawkers>
     "Shanzu"
   ];
   String? selectedLocation;
-  TextEditingController _hawkerLocationleController = TextEditingController();
+  TextEditingController _marketLocationleController = TextEditingController();
 
 
   @override
@@ -114,7 +114,7 @@ class _paidHawkersState extends State<paidHawkers>
         elevation: 0.0,
         toolbarHeight: 80,
         title: Text(
-          "Daily Paid Hawkers",
+          "Daily Paid Markets",
           style: GoogleFonts.manrope(
             // fontFamily: "Mulish",
             fontWeight: FontWeight.w600,
@@ -142,9 +142,9 @@ class _paidHawkersState extends State<paidHawkers>
         decoration: const BoxDecoration(
             color: Colors.white,
             ),
-        child: FutureBuilder<PaidHawkers>(
-          future: paidHawkersFuture, // Replace with your future function
-          builder: (context, AsyncSnapshot<PaidHawkers> snapshot) {
+        child: FutureBuilder<PaidMarket>(
+          future: paidMarketFuture, // Replace with your future function
+          builder: (context, AsyncSnapshot<PaidMarket> snapshot) {
             if (snapshot.connectionState == ConnectionState.waiting) {
               return Center(
                   child:
@@ -161,11 +161,11 @@ class _paidHawkersState extends State<paidHawkers>
                 ],
               );
             } else {
-              paidHawkersList = snapshot.data!.data!;
+              paidMarketList = snapshot.data!.data!;
 
-              print("The paid hawkers list length is ${filteredPaidHawkers}");
+              print("The paid markets list length is ${filteredPaidMarket}");
 
-              if (paidHawkersList!.isEmpty) {
+              if (paidMarketList!.isEmpty) {
                 return ScrollConfiguration(
                   behavior: ScrollBehavior().copyWith(overscroll: false),
                   child: Column(
@@ -181,7 +181,7 @@ class _paidHawkersState extends State<paidHawkers>
                       Column(
                         children: [
                           Text(
-                            'No paid Hawkers yet.',
+                            'No paid Markets yet.',
 
                             style: GoogleFonts.montserrat(
                                 fontWeight: FontWeight.w600,
@@ -221,51 +221,51 @@ class _paidHawkersState extends State<paidHawkers>
                               children: [
                                 Column(
                                   children: [
-                                    InkWell(
-                                      onTap: () {
-                                        setState(() {
-                                          expandItems = !expandItems;
-                                        });
-                                      },
-                                      child: Container(
-                                        width: context.width(),
-                                        padding: const EdgeInsets.all(20.0),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.only(
-                                            topRight: Radius.circular(10.0),
-                                            topLeft: Radius.circular(10.0),
-                                          ),
-                                          color: Color(0xFF414046).withOpacity(0.2),
-                                        ),
-                                        child:  Row(
-                                          crossAxisAlignment:
-                                          CrossAxisAlignment.center,
-                                          children: [
-                                            const Icon(
-                                              Icons
-                                                  .add_circle_outline_outlined,
-                                              color: Colors.black,
-                                            ),
-                                            const SizedBox(
-                                              width: 5,
-                                            ),
-                                            const Text(
-                                              'Filter',
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                            const Spacer(),
-                                            Icon(
-                                              expandItems
-                                                  ? Icons.expand_less
-                                                  : Icons.expand_more,
-                                              color: Colors.black,
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
+                                    // InkWell(
+                                    //   onTap: () {
+                                    //     setState(() {
+                                    //       expandItems = !expandItems;
+                                    //     });
+                                    //   },
+                                    //   child: Container(
+                                    //     width: context.width(),
+                                    //     padding: const EdgeInsets.all(20.0),
+                                    //     decoration: BoxDecoration(
+                                    //       borderRadius: BorderRadius.only(
+                                    //         topRight: Radius.circular(10.0),
+                                    //         topLeft: Radius.circular(10.0),
+                                    //       ),
+                                    //       color: Color(0xFF414046).withOpacity(0.2),
+                                    //     ),
+                                    //     child:  Row(
+                                    //       crossAxisAlignment:
+                                    //       CrossAxisAlignment.center,
+                                    //       children: [
+                                    //         const Icon(
+                                    //           Icons
+                                    //               .add_circle_outline_outlined,
+                                    //           color: Colors.black,
+                                    //         ),
+                                    //         const SizedBox(
+                                    //           width: 5,
+                                    //         ),
+                                    //         const Text(
+                                    //           'Filter',
+                                    //           style: TextStyle(
+                                    //             fontWeight: FontWeight.bold,
+                                    //           ),
+                                    //         ),
+                                    //         const Spacer(),
+                                    //         Icon(
+                                    //           expandItems
+                                    //               ? Icons.expand_less
+                                    //               : Icons.expand_more,
+                                    //           color: Colors.black,
+                                    //         ),
+                                    //       ],
+                                    //     ),
+                                    //   ),
+                                    // ),
                                   ],
                                 ),
                                 if (expandItems)
@@ -299,11 +299,11 @@ class _paidHawkersState extends State<paidHawkers>
                                             SizedBox(height: 15,),
 
                                             TextFormField(
-                                              controller: _hawkerNameController,
+                                              controller: _marketNameController,
                                               keyboardType: TextInputType.emailAddress,
                                               textInputAction: TextInputAction.next,
                                               decoration: InputDecoration(
-                                                hintText: 'Enter Hawker Name',
+                                                hintText: 'Enter Market Name',
                                                 hintStyle: GoogleFonts.manrope(fontSize: fontSize),
                                                 enabledBorder: OutlineInputBorder(
                                                   borderRadius: BorderRadius.circular(14),
@@ -314,11 +314,11 @@ class _paidHawkersState extends State<paidHawkers>
                                             const SizedBox(height: 15),
 
                                             TextFormField(
-                                              controller: _hawkerIdController,
+                                              controller: _marketIdController,
                                               keyboardType: TextInputType.number,
                                               textInputAction: TextInputAction.next,
                                               decoration: InputDecoration(
-                                                hintText: 'Enter Hawker ID',
+                                                hintText: 'Enter Market ID',
                                                 hintStyle: GoogleFonts.manrope(fontSize: fontSize),
                                                 enabledBorder: OutlineInputBorder(
                                                   borderRadius: BorderRadius.circular(14),
@@ -370,9 +370,9 @@ class _paidHawkersState extends State<paidHawkers>
                                                         if (selectedzone != null) {
                                                           setState(() {
                                                             selectedZone = selectedzone;
-                                                            hawkerZoneId = selectedzone!.id.toString();
+                                                            marketZoneId = selectedzone!.id.toString();
                                                             zoneSelected = true;
-                                                            locationsFuture = loadLocations(hawkerZoneId);
+                                                            locationsFuture = loadLocations(marketZoneId);
                                                             selectedDropdownLocation = null;
                                                             selectedLocation = null;
                                                           });
@@ -412,7 +412,7 @@ class _paidHawkersState extends State<paidHawkers>
                                                       "No Locations Found.....");
                                                 } else {
                                                   AllLocationsData = snapshot.data!.data;
-                                                  // speicifcLocationsData = AllLocationsData!.where((element) => element.zoneId == hawkerZoneId).toList();
+                                                  // speicifcLocationsData = AllLocationsData!.where((element) => element.zoneId == marketZoneId).toList();
 
                                                   return DropdownSearch<LocationsDatum>(
                                                       mode: Mode.DIALOG,
@@ -463,7 +463,7 @@ class _paidHawkersState extends State<paidHawkers>
                                             ):
                                             TextFormField(
                                               readOnly: true,
-                                              controller: _hawkerLocationleController,
+                                              controller: _marketLocationleController,
                                               keyboardType: TextInputType.emailAddress,
                                               textInputAction: TextInputAction.next,
                                               decoration: InputDecoration(
@@ -513,14 +513,14 @@ class _paidHawkersState extends State<paidHawkers>
                                                     ),
                                                     child: ElevatedButton(
                                                       onPressed: () async{
-                                                        // if(filteredPaidHawkers == null){
+                                                        // if(filteredPaidMarket == null){
                                                         //
                                                         // }else{
                                                         //   resetFilter();
                                                         // }
-                                                        if (_hawkerNameController.text.isNotEmpty ||
-                                                            _hawkerIdController.text.isNotEmpty ||
-                                                            hawkerZoneId != null ||
+                                                        if (_marketNameController.text.isNotEmpty ||
+                                                            _marketIdController.text.isNotEmpty ||
+                                                            marketZoneId != null ||
                                                             selectedLocation != null) {
                                                           resetFilter();
                                                         }
@@ -571,7 +571,7 @@ class _paidHawkersState extends State<paidHawkers>
                                                     ),
                                                     child: ElevatedButton(
                                                       onPressed: () async{
-                                                        if(_hawkerNameController.text.isEmpty && _hawkerIdController.text.isEmpty && hawkerZoneId == null && selectedLocation == null){
+                                                        if(_marketNameController.text.isEmpty && _marketIdController.text.isEmpty && marketZoneId == null && selectedLocation == null){
                                                           Get.snackbar(
                                                                 'Cannot Filter',
                                                                 'Please Select a parameter first',
@@ -583,7 +583,7 @@ class _paidHawkersState extends State<paidHawkers>
                                                                   borderRadius: 10.0, // Adjust border radius if needed
                                                                 );
                                                         } else{
-                                                          filterPaidHawkers();
+                                                          filterPaidMarket();
                                                         }
 
                                                         },
@@ -631,14 +631,13 @@ class _paidHawkersState extends State<paidHawkers>
                         ),
                         SizedBox(
                           height: 5,
-                        ),
+                      ),
                       ListView.separated(
                           shrinkWrap: true,
                           physics: NeverScrollableScrollPhysics(),
-                          itemCount: (filteredPaidHawkers == null) ?  paidHawkersList!.length : filteredPaidHawkers!.length,
+                          itemCount: (filteredPaidMarket == null) ?  paidMarketList!.length : filteredPaidMarket!.length,
                           itemBuilder: (context, index) {
-                            PaidHawkersDatum hawkerDetails = (filteredPaidHawkers == null) ? paidHawkersList![index]: filteredPaidHawkers![index] ;
-                            String AmountPaid = formatNumb((hawkerDetails.amount ?? 0.0).toString());// Adjust this based on your `formatNumb` function
+                            PaidMarketDatum marketDetails = (filteredPaidMarket == null) ? paidMarketList![index]: filteredPaidMarket![index] ;
                             Color backgroundColor = index % 2 == 0
                                 ? Colors.lightBlueAccent.withOpacity(0.1)
                                 : Colors.white;
@@ -677,7 +676,7 @@ class _paidHawkersState extends State<paidHawkers>
                                                     SizedBox(height: 20),
                                                     Center(
                                                       child: Text(
-                                                        "Hawker Details",
+                                                        "Market Details",
                                                         textAlign: TextAlign.center,
                                                         style: GoogleFonts.manrope(
                                                           fontWeight: FontWeight.bold,
@@ -686,22 +685,14 @@ class _paidHawkersState extends State<paidHawkers>
                                                         ),
                                                       ),
                                                     ),
-                                                    SizedBox(height: 17),
-                                                    buildRichText2('Name: ', hawkerDetails.hawkerName.toString(), fontSize, ),
+                                                    // SizedBox(height: 17),
+                                                    // buildRichText2('Plate/ID: ', marketDetails.marketName.toString(), fontSize, ),
                                                     SizedBox(height: 7),
-                                                    buildRichText2('Mobile: ', hawkerDetails.hawkerMobile.toString(), fontSize, ),
+                                                    buildRichText2('Mobile: ', marketDetails.marketMobile.toString(), fontSize, ),
                                                     SizedBox(height: 7),
-                                                    buildRichText2('ID: ', hawkerDetails.hawkerId.toString(), fontSize, ),
+                                                    buildRichText2('Code: ', marketDetails.transactionCode.toString(), fontSize, ),
                                                     SizedBox(height: 7),
-                                                    buildRichText2('Amount: ', AmountPaid, fontSize, ),
-                                                    SizedBox(height: 7),
-                                                    buildRichText2('Code: ', hawkerDetails.transactionCode.toString(), fontSize, ),
-                                                    SizedBox(height: 7),
-                                                    buildRichText2('Zone: ', hawkerDetails.zoneName.toString(), fontSize, ),
-                                                    SizedBox(height: 7),
-                                                    buildRichText2('Location: ', hawkerDetails.location.toString() ?? "N/A", fontSize, ),
-                                                    SizedBox(height: 7),
-                                                    buildRichText2('Category: ',  hawkerDetails.categories.toString() ?? "N/A", fontSize, ),
+                                                    buildRichText2('Amount: ',  marketDetails.categories.toString(), fontSize, ),
 
                                                     SizedBox(height: 5),
                                                     Align(
@@ -735,31 +726,30 @@ class _paidHawkersState extends State<paidHawkers>
                                         crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                         children: [
+                                          // Row(
+                                          //   mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          //   crossAxisAlignment: CrossAxisAlignment.start,
+                                          //   children: [
+                                          //     // Expanded(
+                                          //     //     child: buildRichText('Plate/ID: ', marketDetails.marketName.toString(), fontSize)),
+                                          //     // SizedBox(width: screenWidth * 0.015),
+                                          //     Expanded(
+                                          //         child: buildRichText('Mobile: ', marketDetails.marketMobile.toString(), fontSize)),
+                                          //   ],
+                                          // ),
+                                          // SizedBox(height: 15),
                                           Row(
                                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
                                               Expanded(
-                                                // flex:2,
-                                                  child: buildRichText('Name: ', hawkerDetails.hawkerName.toString(), fontSize)),
+                                                  child: buildRichText('Mobile: ', marketDetails.marketMobile.toString(), fontSize)),
                                               SizedBox(width: screenWidth * 0.015),
                                               Expanded(
-                                                  // flex:1,
-                                                  child: buildRichText('ID: ', hawkerDetails.hawkerId.toString(), fontSize)),
-                                            ],
-                                          ),
-                                          SizedBox(height: 15),
-                                          Row(
-                                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Expanded(
-                                                  // flex:2,
-                                                  child: buildRichText('Code: ', hawkerDetails.transactionCode.toString(), fontSize)),
+                                                  child: buildRichText('Code: ', marketDetails.transactionCode.toString(), fontSize)),
                                               SizedBox(width: screenWidth * 0.015),
                                               Expanded(
-                                                  // flex:1,
-                                                  child: buildRichText('Zone: ', hawkerDetails.zoneName.toString(), fontSize)),
+                                                  child: buildRichText('Amount: ', marketDetails.categories.toString(), fontSize)),
                                             ],
                                           ),
                                         ],
@@ -934,7 +924,7 @@ class _paidHawkersState extends State<paidHawkers>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Hawker Name',
+                    'Market Name',
                     style: GoogleFonts.manrope(
                       fontSize: fontSize,
                       fontWeight: FontWeight.w500,
@@ -943,11 +933,11 @@ class _paidHawkersState extends State<paidHawkers>
                   ),
                   const SizedBox(height: 10),
                   TextFormField(
-                    controller: _hawkerNameController,
+                    controller: _marketNameController,
                     keyboardType: TextInputType.emailAddress,
                     textInputAction: TextInputAction.next,
                     decoration: InputDecoration(
-                      hintText: 'Enter Hawker Name',
+                      hintText: 'Enter Market Name',
                       hintStyle: GoogleFonts.manrope(fontSize: fontSize),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
@@ -956,97 +946,7 @@ class _paidHawkersState extends State<paidHawkers>
                     ),
                   ),
                   const SizedBox(height: 15),
-                  Text(
-                    'Hawker ID Number',
-                    style: GoogleFonts.manrope(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextFormField(
-                    controller: _hawkerIdController,
-                    keyboardType: TextInputType.number,
-                    textInputAction: TextInputAction.next,
-                    decoration: InputDecoration(
-                      hintText: 'Enter Hawker ID',
-                      hintStyle: GoogleFonts.manrope(fontSize: fontSize),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: const BorderSide(color: Color(0xFF46B1FD)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    'Hawker Zone',
-                    style: GoogleFonts.manrope(
-                      fontSize: fontSize,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  FutureBuilder<GetZones>(
-                    future: zonesFuture!,
-                    builder: (context,
-                        AsyncSnapshot<GetZones>
-                        snapshot) {
-                      if (snapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return createDisabledDropdownSearch(
-                            "Fetching Zones.....");
-                      } else if (snapshot.hasError) {
-                        return createDisabledDropdownSearch(
-                            "Error Fetching Zones.....");
-                      } else if (!snapshot.hasData ||
-                          snapshot
-                              .data!.data!.isEmpty) {
-                        return createDisabledDropdownSearch(
-                            "No Zones Found.....");
-                      } else {
-                        zonesData = snapshot.data!.data;
-                        return DropdownSearch<Datum>(
-                            mode: Mode.DIALOG,
-                            items: zonesData,
-                            itemAsString:
-                                (Datum? zones) =>
-                            zones?.name?? '',
-                            dropdownSearchDecoration:
-                            InputDecoration(
-                              // labelText: "Zones ",
-                              hintText: "Select Zone ",
-                              disabledBorder:
-                              OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Color(0xFF1366D9),
-                                  width: 1.0,
-                                ),
-                              ),
-                            ),
-                            onChanged:
-                                (Datum? selectedZone) {
-                              if (selectedZone != null) {
-                                setState(() {
-                                  hawkerZoneId = selectedZone.id.toString();
-                                });
-                              }
-                            },
-                            showSearchBox: true,
-                            isFilteredOnline: true,
-                            searchFieldProps: TextFieldProps(
-                              cursorColor: Colors.blue,
-                              decoration: InputDecoration(
-                                border: OutlineInputBorder(),
-                                hintText:
-                                'Search My Zone',
-                              ),
-                              // controller: searchController,
-                            ));
-                      }
-                    },
-                  ),
+                  // Simplified filter: Only by Name (Plate/ID)
                   const SizedBox(height: 10),
 
                   Container(
@@ -1109,20 +1009,20 @@ class _paidHawkersState extends State<paidHawkers>
     // Simulate filtering process with a delay of 1 second
     await Future.delayed(Duration(seconds: 1));
     setState(() {
-      _hawkerIdController.clear();
-      _hawkerNameController.clear();
+      _marketIdController.clear();
+      _marketNameController.clear();
       selectedZone = null;
-      hawkerZoneId = null;
+      marketZoneId = null;
       selectedDropdownLocation = null;
       selectedLocation = null;
 
-      filteredPaidHawkers = null;
+      filteredPaidMarket = null;
       _isReseting = false;
     });
   }
 
 
-  Future<void> filterPaidHawkers() async {
+  Future<void> filterPaidMarket() async {
     setState(() {
       _isFiltering = true; // Set _isFiltering to true when filtering starts
     });
@@ -1131,35 +1031,16 @@ class _paidHawkersState extends State<paidHawkers>
     // Simulate filtering process with a delay of 1 second
     await Future.delayed(Duration(seconds: 1));
     setState(() {
-      filteredPaidHawkers = paidHawkersList?.where((hawker) {
-        bool matchesHawkerName = true;
-        bool matchesHawkerId = true;
-        bool matchesHawkerZone = true;
-        bool matchesHawkerLocation = true;
+      filteredPaidMarket = paidMarketList?.where((market) {
+        bool matchesMarketName = true;
 
-        // Check if Hawker Name matches the input
-        if (_hawkerNameController.text.isNotEmpty) {
-          matchesHawkerName = hawker.hawkerName!.toLowerCase().contains(_hawkerNameController.text.toLowerCase());
+        if (_marketNameController.text.isNotEmpty) {
+          matchesMarketName = market.marketName!.toLowerCase().contains(_marketNameController.text.toLowerCase());
         }
 
-        // Check if Hawker ID matches the input
-        if (_hawkerIdController.text.isNotEmpty) {
-          matchesHawkerId = hawker.hawkerId.toString().contains(_hawkerIdController.text);
-        }
-
-        // Check if Hawker Zone matches the selected zone
-        if (selectedZone != null) {
-          print(hawker.zoneName);
-          matchesHawkerZone = hawker.zoneName == selectedZone!.name;
-        }
-
-        if (selectedLocation != null) {
-          matchesHawkerLocation = hawker.location == selectedDropdownLocation!.locationName;
-        }
-
-        return matchesHawkerName && matchesHawkerId && matchesHawkerZone && matchesHawkerLocation;
+        return matchesMarketName;
       }).toList();
-      print("The value is ${filteredPaidHawkers!.length}");
+      print("The value is ${filteredPaidMarket!.length}");
       _isFiltering = false;
       expandItems = !expandItems;
     });
@@ -1167,165 +1048,165 @@ class _paidHawkersState extends State<paidHawkers>
 
 }
 
-class Hawker {
-  String hawkerName;
-  String hawkerMobile;
-  int hawkerId;
+class Market {
+  String marketName;
+  String marketMobile;
+  int marketId;
   int amount;
   String zoneName;
   String transactionCode;
 
-  Hawker({
-    required this.hawkerName,
-    required this.hawkerMobile,
-    required this.hawkerId,
+  Market({
+    required this.marketName,
+    required this.marketMobile,
+    required this.marketId,
     required this.amount,
     required this.zoneName,
     required this.transactionCode
   });
 }
 
-List<Hawker> hawkers = [
-  Hawker(
-      hawkerName: 'John Doe',
-      hawkerMobile: '123-456-7890',
-      hawkerId: 1001,
+List<Market> markets = [
+  Market(
+      marketName: 'John Doe',
+      marketMobile: '123-456-7890',
+      marketId: 1001,
       amount: 500,
       zoneName: 'Zone A',
       transactionCode: "T12345"
   ),
-  Hawker(
-      hawkerName: 'Jane Smith',
-      hawkerMobile: '234-567-8901',
-      hawkerId: 1002,
+  Market(
+      marketName: 'Jane Smith',
+      marketMobile: '234-567-8901',
+      marketId: 1002,
       amount: 600,
       zoneName: 'Zone B',
       transactionCode: "T23456"
   ),
-  Hawker(
-      hawkerName: 'Alice Johnson',
-      hawkerMobile: '345-678-9012',
-      hawkerId: 1003,
+  Market(
+      marketName: 'Alice Johnson',
+      marketMobile: '345-678-9012',
+      marketId: 1003,
       amount: 700,
       zoneName: 'Zone C',
       transactionCode: "T34567"
   ),
-  Hawker(
-      hawkerName: 'Bob Brown',
-      hawkerMobile: '456-789-0123',
-      hawkerId: 1004,
+  Market(
+      marketName: 'Bob Brown',
+      marketMobile: '456-789-0123',
+      marketId: 1004,
       amount: 800,
       zoneName: 'Zone D',
       transactionCode: "T45678"
   ),
-  Hawker(
-      hawkerName: 'Charlie Davis',
-      hawkerMobile: '567-890-1234',
-      hawkerId: 1005,
+  Market(
+      marketName: 'Charlie Davis',
+      marketMobile: '567-890-1234',
+      marketId: 1005,
       amount: 900,
       zoneName: 'Zone E',
       transactionCode: "T56789"
   ),
-  Hawker(
-      hawkerName: 'Daniel Evans',
-      hawkerMobile: '678-901-2345',
-      hawkerId: 1006,
+  Market(
+      marketName: 'Daniel Evans',
+      marketMobile: '678-901-2345',
+      marketId: 1006,
       amount: 550,
       zoneName: 'Zone F',
       transactionCode: "T67890"
   ),
-  Hawker(
-      hawkerName: 'Eve White',
-      hawkerMobile: '789-012-3456',
-      hawkerId: 1007,
+  Market(
+      marketName: 'Eve White',
+      marketMobile: '789-012-3456',
+      marketId: 1007,
       amount: 650,
       zoneName: 'Zone G',
       transactionCode: "T78901"
   ),
-  Hawker(
-      hawkerName: 'Frank Green',
-      hawkerMobile: '890-123-4567',
-      hawkerId: 1008,
+  Market(
+      marketName: 'Frank Green',
+      marketMobile: '890-123-4567',
+      marketId: 1008,
       amount: 750,
       zoneName: 'Zone H',
       transactionCode: "T89012"
   ),
-  Hawker(
-      hawkerName: 'Grace Hall',
-      hawkerMobile: '901-234-5678',
-      hawkerId: 1009,
+  Market(
+      marketName: 'Grace Hall',
+      marketMobile: '901-234-5678',
+      marketId: 1009,
       amount: 850,
       zoneName: 'Zone I',
       transactionCode: "T90123"
   ),
-  Hawker(
-      hawkerName: 'Hank Brown',
-      hawkerMobile: '012-345-6789',
-      hawkerId: 1010,
+  Market(
+      marketName: 'Hank Brown',
+      marketMobile: '012-345-6789',
+      marketId: 1010,
       amount: 950,
       zoneName: 'Zone J',
       transactionCode: "T01234"
   ),
-  Hawker(
-      hawkerName: 'Ivy Black',
-      hawkerMobile: '123-456-7891',
-      hawkerId: 1011,
+  Market(
+      marketName: 'Ivy Black',
+      marketMobile: '123-456-7891',
+      marketId: 1011,
       amount: 500,
       zoneName: 'Zone K',
       transactionCode: "T11223"
   ),
-  Hawker(
-      hawkerName: 'Jack White',
-      hawkerMobile: '234-567-8902',
-      hawkerId: 1012,
+  Market(
+      marketName: 'Jack White',
+      marketMobile: '234-567-8902',
+      marketId: 1012,
       amount: 600,
       zoneName: 'Zone L',
       transactionCode: "T22334"
   ),
-  Hawker(
-      hawkerName: 'Karen Brown',
-      hawkerMobile: '345-678-9013',
-      hawkerId: 1013,
+  Market(
+      marketName: 'Karen Brown',
+      marketMobile: '345-678-9013',
+      marketId: 1013,
       amount: 700,
       zoneName: 'Zone M',
       transactionCode: "T33445"
   ),
-  Hawker(
-      hawkerName: 'Larry King',
-      hawkerMobile: '456-789-0124',
-      hawkerId: 1014,
+  Market(
+      marketName: 'Larry King',
+      marketMobile: '456-789-0124',
+      marketId: 1014,
       amount: 800,
       zoneName: 'Zone N',
       transactionCode: "T44556"
   ),
-  Hawker(
-      hawkerName: 'Mona Lisa',
-      hawkerMobile: '567-890-1235',
-      hawkerId: 1015,
+  Market(
+      marketName: 'Mona Lisa',
+      marketMobile: '567-890-1235',
+      marketId: 1015,
       amount: 900,
       zoneName: 'Zone O',
       transactionCode: "T55667"
   ),
-  Hawker(
-      hawkerName: 'Nate Grey',
-      hawkerMobile: '678-901-2346',
-      hawkerId: 1016,
+  Market(
+      marketName: 'Nate Grey',
+      marketMobile: '678-901-2346',
+      marketId: 1016,
       amount: 550,
       zoneName: 'Zone P',
       transactionCode: "T66778"
   ),
-  Hawker(
-      hawkerName: 'Olivia Blue',
-      hawkerMobile: '789-012-3457',
-      hawkerId: 1017,
+  Market(
+      marketName: 'Olivia Blue',
+      marketMobile: '789-012-3457',
+      marketId: 1017,
       amount: 650,
       zoneName: 'Zone Q',
       transactionCode: "T77889"
   ),
-  Hawker(
-      hawkerName: 'Paul Black',
-      hawkerMobile: '890-123-4568',
-      hawkerId: 1018,
+  Market(
+      marketName: 'Paul Black',
+      marketMobile: '890-123-4568',
+      marketId: 1018,
       amount: 750,
       zoneName: 'Zone R',
       transactionCode: "T88990"

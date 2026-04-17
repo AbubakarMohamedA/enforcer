@@ -473,7 +473,6 @@ class _offLoadingListState extends State<offLoadingList> {
                                                       ),
                                                       const SizedBox(height: 10),
                                                       DropdownSearch<String>(
-                                                        mode: Mode.DIALOG,
                                                         items: statusList, // List of Strings
                                                         selectedItem: statusSelected,
                                                         dropdownSearchDecoration: InputDecoration(
@@ -864,8 +863,6 @@ class _offLoadingListState extends State<offLoadingList> {
   }
   Widget createDisabledDropdownSearch(String hintText, double fontSize) {
     return DropdownSearch<String>(
-      mode: Mode.MENU,
-      showSelectedItems: true,
       items: [],
       dropdownSearchDecoration: InputDecoration(
         disabledBorder: OutlineInputBorder(
@@ -877,9 +874,6 @@ class _offLoadingListState extends State<offLoadingList> {
         hintText: hintText,
         hintStyle: GoogleFonts.manrope(fontSize: fontSize),
       ),
-      onChanged: print,
-      maxHeight: 130,
-      popupBackgroundColor: Colors.grey[200],
       enabled: false,
     );
   }

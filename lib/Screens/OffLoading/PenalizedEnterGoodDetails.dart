@@ -432,7 +432,6 @@ class _PenalizedgoodDetailsAddState extends State<PenalizedgoodDetailsAdd> {
 
                                       return DropdownSearch<String>(
                                         key: _ItemDropdownKey,
-                                        mode: Mode.DIALOG,
                                         items: itemNames, // Use item names for dropdown
                                         // selectedItem: holdingItem?.itemName, // Selected item
                                         itemAsString: (String? itemName) => itemName ?? '',
@@ -517,7 +516,6 @@ class _PenalizedgoodDetailsAddState extends State<PenalizedgoodDetailsAdd> {
                                 ):
                                 DropdownSearch<OffLoadingItemsDatum>(
                                   key: _UomDropdownKey,
-                                  mode: Mode.DIALOG,
                                   items: selectedItems, // Use item names for dropdown
                                   // selectedItem: selectedUomItem, // Selected item
                                   itemAsString: (OffLoadingItemsDatum? item) => item?.uom ?? '',
@@ -1212,8 +1210,6 @@ class _PenalizedgoodDetailsAddState extends State<PenalizedgoodDetailsAdd> {
 
   Widget createDisabledDropdownSearch(String hintText, double fontSize) {
     return DropdownSearch<String>(
-      mode: Mode.MENU,
-      showSelectedItems: true,
       items: [],
       dropdownSearchDecoration: InputDecoration(
         disabledBorder: OutlineInputBorder(
@@ -1225,9 +1221,6 @@ class _PenalizedgoodDetailsAddState extends State<PenalizedgoodDetailsAdd> {
         hintText: hintText,
         hintStyle: GoogleFonts.manrope(fontSize: fontSize),
       ),
-      onChanged: print,
-      maxHeight: 130,
-      popupBackgroundColor: Colors.grey[200],
       enabled: false,
 
     );

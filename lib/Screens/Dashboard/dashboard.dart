@@ -1,7 +1,7 @@
-
+import 'dart:convert';
 import 'dart:io';
 import 'package:enforcer/Data/userData.dart';
-
+import '../../Api/api_provider.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
@@ -16,7 +16,6 @@ import 'package:intl/intl.dart';
 
 import 'package:nb_utils/nb_utils.dart';
 import 'package:url_launcher/url_launcher.dart';
-// import 'package:url_launcher/url_launcher.dart';
 import '../../animation.dart';
 
 import '../../test.dart';
@@ -25,6 +24,7 @@ import '../Cess/Cess.dart';
 import '../Hawkers/hawkers.dart';
 import '../OffLoading/off_loading.dart';
 import '../Parking/parking.dart';
+import '../MarketEntry/market_entry.dart';
 import '../Profile/profile.dart';
 import '../Psv/psv.dart';
 import '../Traffic_Offense/traffic.dart';
@@ -42,14 +42,13 @@ class Dashboard extends StatefulWidget {
   State<Dashboard> createState() => _DashboardState();
 }
 
-class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateMixin {
+class _DashboardState extends State<Dashboard> with SingleTickerProviderStateMixin {
 
   bool isDownloading = false;
   bool isDoneDownloading = false;
   double? percentage = 0;
 
   Future<void> _checkVersionAndLoadDetails() async {
-    // Retrieve current app version dynamically
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     String currentVersion = packageInfo.version;
     print("The package version is: ${currentVersion}");
@@ -58,29 +57,40 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
       final remoteConfig = FirebaseRemoteConfig.instance;
       await remoteConfig.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 10),
-        minimumFetchInterval: Duration.zero, // Set to zero for testing to always fetch latest
+        minimumFetchInterval: Duration.zero,
       ));
 
-      // Fetch and activate remote config
       bool updated = await remoteConfig.fetchAndActivate();
       print("Fetch and activate status: $updated");
 
-      // Fetch and activate remote config
       await remoteConfig.fetchAndActivate();
 
-      // Get latest version from Remote Config
-      String latestVersion = remoteConfig.getString('latest_playstore_version'); // ANDROID VERSION
+      String latestVersion = remoteConfig.getString('latest_playstore_version');
       print("The latest version from Remote Config is: ${latestVersion}");
 
-      // Compare versions
       if (latestVersion.isNotEmpty && currentVersion != latestVersion) {
-        // Prompt user to update app
         if (mounted) {
           _showUpdatePrompt();
         }
       }
     } catch (e) {
       print('Error fetching latest version: $e');
+    }
+  }
+
+  Future<void> fetchModuleVisibility() async {
+    try {
+      final remoteConfig = FirebaseRemoteConfig.instance;
+      String raw = remoteConfig.getString('module_visibility');
+      if (raw.isNotEmpty) {
+        final Map<String, dynamic> decoded = jsonDecode(raw);
+        setState(() {
+          moduleVisibility = decoded.map((k, v) => MapEntry(k, v as bool));
+        });
+        print("Module visibility loaded: $moduleVisibility");
+      }
+    } catch (e) {
+      print('Error fetching module visibility: $e');
     }
   }
 
@@ -91,13 +101,13 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     final fontSize = screenWidth / 28.0;
     showDialog(
       context: context,
-      barrierDismissible: false, // Dialog cannot be dismissed by tapping outside
+      barrierDismissible: false,
       builder: (context) => WillPopScope(
-        onWillPop: () async => false, // Prevent dialog from closing when back button is pressed
+        onWillPop: () async => false,
         child: AlertDialog(
           surfaceTintColor: Colors.white,
           content: Container(
-            width: MediaQuery.of(context).size.width, // Adjust the width as needed
+            width: MediaQuery.of(context).size.width,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -107,7 +117,6 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                   child: Image.asset(
                     "assets/images/update.png",
                     width: MediaQuery.of(context).size.width,
-                    // height: 300,
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -127,7 +136,7 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                   style: ButtonStyle(
                     shape: MaterialStateProperty.all<RoundedRectangleBorder>(
                       RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8.0), // Set circular border radius
+                        borderRadius: BorderRadius.circular(8.0),
                       ),
                     ),
                     backgroundColor: MaterialStateProperty.all<Color>(Colors.black),
@@ -136,7 +145,6 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                   ),
                   onPressed: () {
                     _launchPlatformm();
-                    // downloadAndInstallApk();
                   },
                   child: Text(
                     'Continue',
@@ -153,61 +161,23 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     );
   }
 
-  // void _launchPlatform() async {
-  //   String url;
-  //
-  //   if (Platform.isAndroid) {
-  //     // url = 'market://details?id=com.mcp.enforcer';
-  //     url = 'https://play.google.com/store/apps/details?id=com.mcp.enforcer'; // Use the HTTPS URL for Play Store
-  //
-  //   } else if (Platform.isIOS) {
-  //     url = 'https://apps.apple.com/app/id6636477035'; // Use HTTPS for the App Store
-  //
-  //   } else {
-  //     throw 'Unsupported platform';
-  //   }
-  //
-  //   try {
-  //     await launchUrl(
-  //      Uri.parse(url),
-  //       customTabsOptions: CustomTabsOptions(
-  //         colorSchemes: CustomTabsColorSchemes.defaults(
-  //           toolbarColor: Colors.amberAccent,
-  //           navigationBarColor: Colors.brown,
-  //         ),
-  //         urlBarHidingEnabled: true,
-  //         showTitle: true,
-  //         browser: const CustomTabsBrowserConfiguration(
-  //           prefersDefaultBrowser: true,
-  //         ),
-  //       ),
-  //
-  //     );
-  //   } catch (e) {
-  //     print('Could not launch $url: $e');
-  //   }
-  // }
-
   void _launchPlatformm() async {
     String url;
 
     if (Platform.isAndroid) {
-      url = 'https://play.google.com/store/apps/details?id=com.mcp.enforcer'; // HTTPS URL for Play Store
+      url = 'https://play.google.com/store/apps/details?id=com.mcp.enforcer';
     } else if (Platform.isIOS) {
-      url = 'https://apps.apple.com/app/id6636477035'; // HTTPS URL for the App Store
+      url = 'https://apps.apple.com/app/id6636477035';
     } else {
       throw UnsupportedError('Unsupported platform');
     }
 
-    // Attempt to launch the URL
     if (await canLaunch(url)) {
       await launch(url);
     } else {
       throw 'Could not launch $url';
     }
   }
-
-
 
   int innerCurrentPage = 0;
   int outerCurrentPage = 0;
@@ -218,7 +188,9 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadUserData();
     });
-    _checkVersionAndLoadDetails();
+    _checkVersionAndLoadDetails().then((_) {
+      fetchModuleVisibility();
+    });
     super.initState();
   }
 
@@ -234,7 +206,6 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
   final _kmobile = "mobile_preference";
   final _token = 'token_preference';
 
-
   late SharedPreferences prefs;
   String? id;
   String? email;
@@ -243,7 +214,6 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
   String? mobile;
   String? token;
 
-
   String? initials = "AM";
 
   Future<void> _loadUserData() async {
@@ -251,36 +221,32 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     setState(() {
       id = prefs.getString(_kId) ?? '';
       email = prefs.getString(_kemail) ?? '';
-      // firstName = prefs.getString(_firstName) ?? '';
-      // lastName = prefs.getString(_lastName) ?? '';
       firstName = userData.firstName ?? '';
       lastName = userData.lastName ?? '';
 
       print("The first and last names are ${firstName} ${lastName}");
       mobile = prefs.getString(_kmobile) ?? '';
       token = prefs.getString(_token) ?? '';
-      // List<String> nameParts = fullName!.split(' ');
-      // firstName = nameParts[0];
-      // lastName = nameParts[1];
 
       if (firstName != null && firstName!.isNotEmpty && lastName != null &&
           lastName!.isNotEmpty) {
         initials = '${firstName![0]}${lastName![0]}'.toUpperCase();
       } else {
-        // Handle the case where fullName is null or empty
         initials = 'NA';
       }
     });
+    
+    await _checkAllPermissions();
   }
 
   List imgsrc = [
     'assets/images/parking.png',
     'assets/images/PSV.png',
     'assets/images/cess.png',
-    'assets/images/warning.png', /*road */
-
-    'assets/images/meat.png',  /* Food */  /* street */
+    'assets/images/warning.png',
+    'assets/images/meat.png',
     'assets/images/unload.png',
+    'assets/images/market-entry.png',
   ];
 
   List title = [
@@ -290,10 +256,8 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     'TRAFFIC OFFENCE',
     'HAWKERS',
     'OFF LOADING',
-
+    'MARKET ENTRY',
   ];
-
-
 
   List delay = [
     2.0,
@@ -302,10 +266,21 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     0.8,
     0.5,
     0.2,
+    0.0,
   ];
 
-  Map<String, bool> moduleStatus = {
+  // Firestore — controls maintenance dialog (card shows but tapping shows dialog)
+  Map<String, bool> moduleStatus = {};
 
+  // Remote Config — controls visibility (hides card entirely when false)
+  Map<String, bool> moduleVisibility = {
+    'parking': true,
+    'psv': true,
+    'cess': true,
+    'traffic offence': true,
+    'hawkers': true,
+    'off loading': true,
+    'market entry': true,
   };
 
   List modules = [
@@ -315,13 +290,63 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     'traffic offence',
     'hawkers',
     'off loading',
+    'market entry',
   ];
+
+  bool isLoadingPermissions = true;
+  Map<String, bool> modulePermissionsLoaded = {};
+
+  final Map<String, String> modulePermissionKeys = {
+    'parking': 'Access Parking',       
+    'psv': 'Access PSV',               
+    'cess': 'Access Cess',             
+    'traffic offence': 'Access Traffic', 
+    'hawkers': 'Access Hawkers',
+    'off loading': 'Access OffLoading',
+    'market entry': 'Access Toll Market',
+  };
+
+  Future<void> _checkAllPermissions() async {
+    if (token == null || token!.isEmpty) {
+      if (mounted) {
+        setState(() { isLoadingPermissions = false; });
+      }
+      return;
+    }
+    
+    if (mounted) {
+      setState(() { isLoadingPermissions = true; });
+    }
+
+    Map<String, bool> localPerms = {};
+    List<Future<void>> checks = [];
+    
+    for (String module in modules) {
+       String pType = modulePermissionKeys[module] ?? 'Unknown Permission';
+       checks.add(
+         ApiProvider().checkPermission(permissionType: pType, token: token!).then((res) {
+            localPerms[module] = res['access'] == true;
+         }).catchError((e) {
+            localPerms[module] = false;
+         })
+       );
+    }
+    
+    await Future.wait(checks);
+    
+    if (mounted) {
+      setState(() { 
+        modulePermissionsLoaded = localPerms;
+        isLoadingPermissions = false; 
+      });
+    }
+  }
 
   void fetchModuleStatus() {
     FirebaseFirestore.instance.collection('demoModules').snapshots().listen((snapshot) {
       snapshot.docs.forEach((doc) {
         setState(() {
-          moduleStatus [doc.id] = doc['enabled'];
+          moduleStatus[doc.id] = doc['enabled'];
           print(moduleStatus);
         });
       });
@@ -334,7 +359,6 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
   @override
   Widget build(BuildContext context) {
 
-// Convert double delays to Duration
     List<Duration> delayDurations = delay.map((d) => Duration(milliseconds: (d * 1000).toInt())).toList();
 
     Size size = MediaQuery.of(context).size;
@@ -347,20 +371,25 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
     height = size.height;
     width = size.width;
     todayDate = DateFormat("EEE, MMM d, yyyy").format(nowTime).toString();
-    DateTime? _lastBackPressTime;
-    // DateTime nowTime = DateTime.now();
-    // DateFormat dateFormat = DateFormat("EEE, MMM d, yyyy");
-    // String todayDate = dateFormat.format(nowTime).toString();
+
+    // Filter indices by Remote Config and User Permissions
+    List<int> visibleIndices = List.generate(title.length, (i) => i)
+        .where((i) {
+          String mod = modules[i].toLowerCase();
+          bool isVisible = moduleVisibility[mod] != false;
+          bool hasPermission = modulePermissionsLoaded[mod] == true;
+          return isVisible && hasPermission;
+        })
+        .toList();
+
     return Builder(builder: (context) {
       return WillPopScope(
         onWillPop: () async {
-          // Close the app immediately without showing a dialog
           SystemChannels.platform.invokeMethod('SystemNavigator.pop');
-          return false; // Return false to indicate that the back navigation should not be handled by default
+          return false;
         },
         child: Scaffold(
             backgroundColor: Colors.white,
-            // drawer:  drawer(),
             body: ScrollConfiguration(
               behavior: ScrollBehavior().copyWith(overscroll: false),
               child: SingleChildScrollView(
@@ -373,18 +402,14 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                         width: size.width,
                         decoration: const BoxDecoration(
                             borderRadius: BorderRadius.only(
-                              // bottomLeft: Radius.circular(30),
                                 bottomRight: Radius.circular(30)),
                             image: DecorationImage(
                                 image: AssetImage('assets/images/msa2.jpg'), fit: BoxFit.cover)),
                         child: Container(
                           decoration: BoxDecoration(
                               borderRadius: const BorderRadius.only(
-                                // bottomLeft: Radius.circular(30),
                                   bottomRight: Radius.circular(30)),
                               gradient: LinearGradient(colors: [
-                                // Color(0xFF3E4095).withOpacity(0.95),
-                                // Color(0xFF3E4095).withOpacity(0.9)
                                 Color(0xFF3E4095).withOpacity(0.95),
                                 Color(0xFF3E4095).withOpacity(0.95)
                               ])),
@@ -395,30 +420,25 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                 Container(
                                   width: size.width,
                                   child: Padding(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10.0),
+                                    padding: const EdgeInsets.symmetric(horizontal: 10.0),
                                     child: Row(
-                                      mainAxisAlignment: MainAxisAlignment
-                                          .spaceBetween,
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Builder(
                                             builder: (context) {
                                               return GestureDetector(
                                                 onTap: () {
-                                                  // Scaffold.of(context).openDrawer();
                                                   AppDrawer.of(context)?.toggle();
                                                 },
                                                 child: IconButton(
                                                   icon: SvgPicture.asset(
                                                     'assets/images/menu (3).svg',
-                                                    // Make sure to add your SVG file to the assets directory
                                                     height: 20.0,
                                                     width: 20.0,
                                                     color: Colors.white,
                                                   ),
                                                   onPressed: () {
-                                                    // Scaffold.of(context).openDrawer();
                                                     AppDrawer.of(context)?.toggle();
                                                   },
                                                 ),
@@ -427,26 +447,19 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                         ),
 
                                         Container(
-                                          // height: screenWidth * 0.26,
                                           height: screenWidth * 0.165,
                                           decoration: BoxDecoration(
-                                            // color: Colors.greenAccent,
                                             boxShadow: [
                                               BoxShadow(
                                                 color: Colors.white.withOpacity(0.5),
-                                                // Adjust opacity to control shadow intensity
                                                 spreadRadius: 5,
-                                                // Spread the shadow
                                                 blurRadius: 90,
-                                                // Blur the shadow
-                                                offset: Offset(
-                                                    0, 0), // Offset the shadow (x, y)
+                                                offset: Offset(0, 0),
                                               ),
                                             ],
                                           ),
                                           child: Image.asset(
                                             'assets/images/mcg-logoo.png',
-                                            // height: screenWidth * 0.165,
                                             fit: BoxFit.cover,
                                           ),
                                         ),
@@ -469,17 +482,14 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                             ),
                                             child: Center(
                                               child: Text(
-                                                // 'SW',
                                                 initials!,
                                                 style: GoogleFonts.manrope(
-                                                  // fontWeight: FontWeight.bold,
                                                   color: Colors.white,
                                                 ),
                                               ),
                                             ),
                                           ),
                                         ),
-                                        // Container()
                                       ],
                                     ),
                                   ),
@@ -493,17 +503,13 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                     children: [
                                       Container(
                                         child: Column(
-                                          // crossAxisAlignment: CrossAxisAlignment.start,
-                                            mainAxisAlignment: MainAxisAlignment
-                                                .center,
+                                            mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
                                               Center(
                                                 child: Text(
-                                                  // "Welcome Swaleh,",
                                                   textAlign: TextAlign.center,
                                                   "County Government of Mombasa",
                                                   style: GoogleFonts.manrope(
-                                                    // fontFamily: "Mulish",
                                                     fontWeight: FontWeight.w600,
                                                     fontSize: fontSize * 1.4,
                                                     color: Colors.white,
@@ -516,18 +522,15 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                                   textAlign: TextAlign.center,
                                                   "Enforcer Mobile Application",
                                                   style: GoogleFonts.manrope(
-                                                    // fontFamily: "Mulish",
                                                     fontWeight: FontWeight.w600,
                                                     fontSize: fontSize * 1.2,
                                                     color: Colors.white,
                                                   ),
                                                 ),
                                               ),
-                                              SizedBox(height:21),
-                                              // _innerBannerSlider(size.height,size.width),
+                                              SizedBox(height: 21),
                                               Container(
-                                                color: Colors.white.withOpacity(
-                                                    0.7),
+                                                color: Colors.white.withOpacity(0.7),
                                                 height: 1,
                                                 width: width * 0.9,
                                               ),
@@ -541,43 +544,32 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                                     SizedBox(
                                                       width: screenWidth * 0.5,
                                                       child: Text(
-                                                        // "Welcome Swaleh,",
                                                         "Welcome, ${firstName} 👋",
                                                         style: GoogleFonts.manrope(
-                                                          // fontFamily: "Mulish",
-                                                          fontWeight: FontWeight
-                                                              .w600,
+                                                          fontWeight: FontWeight.w600,
                                                           fontSize: fontSize * 1.1,
                                                           color: Colors.white,
                                                         ),
                                                       ),
                                                     ),
                                                     SizedBox(width: screenWidth * 0.03,),
-                                                    // Spacer(),
                                                     Expanded(
                                                       child: Row(
-                                                        crossAxisAlignment: CrossAxisAlignment
-                                                            .center,
+                                                        crossAxisAlignment: CrossAxisAlignment.center,
                                                         children: [
                                                           Icon(
                                                             Icons.calendar_today,
-                                                            color: Colors.white
-                                                                .withOpacity(0.5),
+                                                            color: Colors.white.withOpacity(0.5),
                                                             size: 15,
                                                           ),
-                                                          const SizedBox(
-                                                            width: 8,
-                                                          ),
+                                                          const SizedBox(width: 8,),
                                                           Flexible(
                                                             child: Text(
                                                               todayDate,
-                                                              style: GoogleFonts
-                                                                  .manrope(
-                                                                // fontFamily: "Mulish",
+                                                              style: GoogleFonts.manrope(
                                                                 fontSize: fontSize * 1,
                                                                 color: Colors.white,),
-                                                              overflow: TextOverflow
-                                                                  .ellipsis,
+                                                              overflow: TextOverflow.ellipsis,
                                                             ),
                                                           ),
                                                         ],
@@ -586,16 +578,12 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                                   ],
                                                 ),
                                               ),
-
-                                              //  Comment for ios
-                                              // SizedBox(height: 30,),
                                             ]),
                                       ),
-
                                     ],
                                   ),
                                 ),
-                                SizedBox(height:23,),
+                                SizedBox(height: 23,),
                               ],
                             ),
                           ),
@@ -613,20 +601,25 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                   "Select A Service",
                                   textAlign: TextAlign.left,
                                   style: GoogleFonts.manrope(
-                                    // fontFamily: "Mulish",
                                     fontWeight: FontWeight.w600,
                                     fontSize: fontSize * 1.3,
                                     color: Colors.black,
                                   ),
                                 ),
                                 Spacer(),
-
                               ],
                             ),
                           ),
                           Padding(
-                            padding:  EdgeInsets.only(left: 10.0, right: 10,top: screenHeight * 0.024),
-                            child: GridView.builder(
+                            padding: EdgeInsets.only(left: 10.0, right: 10, top: screenHeight * 0.024),
+                            child: isLoadingPermissions
+                                ? Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.only(top: 50.0),
+                                      child: CircularProgressIndicator(color: Color(0xFF3E4095)),
+                                    ),
+                                  )
+                                : GridView.builder(
                                 padding: EdgeInsets.zero,
                                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
@@ -634,13 +627,13 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                   mainAxisSpacing: 7,
                                 ),
                                 shrinkWrap: true,
-                                itemCount: title.length,
+                                itemCount: visibleIndices.length,
                                 physics: NeverScrollableScrollPhysics(),
                                 itemBuilder: (context, index) {
+                                  final originalIndex = visibleIndices[index];
                                   return InkWell(
                                     onTap: () {
-                                      // Navigate to the corresponding page when a container is tapped
-                                      String module = modules[index].toLowerCase();
+                                      String module = modules[originalIndex].toLowerCase();
                                       if (moduleStatus[module] == false) {
                                         showDialog(
                                           context: context,
@@ -651,85 +644,38 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                                           },
                                         );
                                       } else {
-                                        switch (index) {
+                                        switch (originalIndex) {
                                           case 0:
-                                            Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (c) =>
-                                                        parking(
-
-                                                        )));
-                                            //   showDialog(
-                                            //       context: context,
-                                            //       builder: (ctx) {
-                                            //         return underDevelopment(
-                                            //           message: 'Our team is currently performing maintenance on this module. We apologize for any inconvenience and appreciate your understanding. Please check back later.',
-                                            //         );});
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => parking()));
                                             break;
                                           case 1:
-                                            Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (c) =>
-                                                        psv(
-                                                        )));
-                                            // showDialog(
-                                            //     context: context,
-                                            //     builder: (ctx) {
-                                            //       return underDevelopment(
-                                            //         message: 'Our team is currently performing maintenance on this module. We apologize for any inconvenience and appreciate your understanding. Please check back later.',
-                                            //       );});
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => psv()));
                                             break;
                                           case 2:
                                             Navigator.push(context, MaterialPageRoute(builder: (c) => cess()));
-                                            // showDialog(
-                                            //     context: context,
-                                            //     builder: (ctx) {
-                                            //       return underDevelopment(
-                                            //         message: 'Our team is currently performing maintenance on this module. We apologize for any inconvenience and appreciate your understanding. Please check back later.',
-                                            //       );});
                                             break;
                                           case 3:
                                             Navigator.push(context, MaterialPageRoute(builder: (c) => traffic()));
-                                            // showDialog(
-                                            //     context: context,
-                                            //     builder: (ctx) {
-                                            //       return underDevelopment(
-                                            //         message: 'Our team is currently performing maintenance on this module. We apologize for any inconvenience and appreciate your understanding. Please check back later.',
-                                            //       );});
                                             break;
                                           case 4:
-                                            Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (c) =>
-                                                        hawkers(
-                                                          token: token,
-                                                        )));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => hawkers(token: token)));
                                             break;
                                           case 5:
-                                            Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                    builder: (c) =>
-                                                        offBoarding(
-                                                          token: token,
-                                                        )));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => offBoarding(token: token)));
+                                            break;
+                                          case 6:
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => MarketEntry(token: token)));
                                             break;
                                         }
                                       }
-
-
-
                                     },
                                     child: CardField(
                                       size,
-                                      imgsrc[index],
-                                      title[index],
+                                      imgsrc[originalIndex],
+                                      title[originalIndex],
                                       "assets/images/pattern.png",
-                                      delay[index],
-                                      fontSize
+                                      delay[originalIndex],
+                                      fontSize,
                                     ),
                                   );
                                 }
@@ -737,8 +683,6 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
                           ),
                         ],
                       ),
-
-
 
                       SizedBox(height: 10,),
                     ]),
@@ -755,18 +699,14 @@ class _DashboardState extends State<Dashboard>   with SingleTickerProviderStateM
       width: size.width,
       decoration: const BoxDecoration(
           borderRadius: BorderRadius.only(
-            // bottomLeft: Radius.circular(30),
               bottomRight: Radius.circular(30)),
           image: DecorationImage(
               image: AssetImage('assets/images/msa.png'), fit: BoxFit.cover)),
       child: Container(
         decoration: BoxDecoration(
             borderRadius: const BorderRadius.only(
-              // bottomLeft: Radius.circular(30),
                 bottomRight: Radius.circular(30)),
             gradient: LinearGradient(colors: [
-              // Color(0xFF3E4095).withOpacity(0.95),
-              // Color(0xFF3E4095).withOpacity(0.9)
               Color(0xFF3E4095).withOpacity(0.95),
               Color(0xFF3E4095).withOpacity(0.95)
             ])),
@@ -781,7 +721,7 @@ CardField(
     Size size,
     String img,
     String title,
-    String patternImg, // Add pattern image parameter
+    String patternImg,
     double delay,
     double fontSize,
     ) {
@@ -791,7 +731,6 @@ CardField(
       margin: EdgeInsets.symmetric(vertical: 0, horizontal: 8),
       child: Stack(
         children: [
-          // Pattern image
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
@@ -801,7 +740,6 @@ CardField(
               ),
             ),
           ),
-          // Color overlay
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(15),
@@ -811,12 +749,11 @@ CardField(
                   color: Colors.black.withOpacity(0.2),
                   spreadRadius: 2,
                   blurRadius: 5,
-                  offset: Offset(0, 5), // changes position of shadow
+                  offset: Offset(0, 5),
                 ),
               ],
             ),
           ),
-          // Content
           Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
@@ -824,7 +761,6 @@ CardField(
               children: [
                 Image.asset(
                   img,
-                  // width: 50,
                   width: size.width * 0.14,
                 ),
                 SizedBox(height: 15,),
@@ -832,7 +768,6 @@ CardField(
                   title,
                   textAlign: TextAlign.center,
                   style: GoogleFonts.manrope(
-                    // fontSize: 14,
                     fontSize: fontSize,
                     color: Colors.white,
                   ),

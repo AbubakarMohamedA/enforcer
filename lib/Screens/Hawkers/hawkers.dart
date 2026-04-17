@@ -1741,8 +1741,6 @@ class _hawkersState extends State<hawkers> with SingleTickerProviderStateMixin {
   }
   Widget createDisabledDropdownSearch(String hintText) {
     return DropdownSearch<String>(
-      mode: Mode.MENU,
-      showSelectedItems: true,
       items: [],
       dropdownSearchDecoration: InputDecoration(
         disabledBorder: OutlineInputBorder(
@@ -1753,9 +1751,6 @@ class _hawkersState extends State<hawkers> with SingleTickerProviderStateMixin {
         ),
         hintText: hintText,
       ),
-      onChanged: print,
-      maxHeight: 130,
-      popupBackgroundColor: Colors.grey[200],
       enabled: false,
     );
   }

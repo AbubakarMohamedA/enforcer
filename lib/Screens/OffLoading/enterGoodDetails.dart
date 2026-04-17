@@ -392,7 +392,6 @@ class _goodDetailsAddState extends State<goodDetailsAdd> {
 
                                   return DropdownSearch<String>(
                                     key: _ItemDropdownKey,
-                                    mode: Mode.DIALOG,
                                     items: itemNames, // Use item names for dropdown
                                     // selectedItem: holdingItem?.itemName, // Selected item
                                     itemAsString: (String? itemName) => itemName ?? '',
@@ -1088,8 +1087,6 @@ class _goodDetailsAddState extends State<goodDetailsAdd> {
 
   Widget createDisabledDropdownSearch(String hintText, double fontSize) {
     return DropdownSearch<String>(
-      mode: Mode.MENU,
-      showSelectedItems: true,
       items: [],
       dropdownSearchDecoration: InputDecoration(
         disabledBorder: OutlineInputBorder(
@@ -1101,9 +1098,6 @@ class _goodDetailsAddState extends State<goodDetailsAdd> {
         hintText: hintText,
         hintStyle: GoogleFonts.manrope(fontSize: fontSize),
       ),
-      onChanged: print,
-      maxHeight: 130,
-      popupBackgroundColor: Colors.grey[200],
       enabled: false,
 
     );

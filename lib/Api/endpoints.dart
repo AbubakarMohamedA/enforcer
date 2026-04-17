@@ -23,6 +23,9 @@ class Endpoints {
   // Hawkers  URL
   static const String HAWKER_URL = "${MAIN_URL}hawkers/index.php";
 
+  // Market  URL
+  static const String MARKET_URL = "${MAIN_URL}staff/toll_market/index.php";
+
   // Check Status
   static const String CHECKSTATUS_URL = "${MAIN_URL}staff/parking/check_status.php";
 

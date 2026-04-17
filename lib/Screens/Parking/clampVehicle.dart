@@ -212,7 +212,6 @@ class _clampVehicleState extends State<clampVehicle> {
                                               return Column(
                                                 children: [
                                                   DropdownSearch<GetVehicleCategoriesModel>(
-                                                      mode: Mode.DIALOG,
                                                       items: clampController.vehicleCategories,
                                                       // Pass the list directly
                                                       itemAsString:
@@ -329,7 +328,6 @@ class _clampVehicleState extends State<clampVehicle> {
                                               children: [
                                                 // Zone Dropdown
                                                 DropdownSearch<GetMyZones>(
-                                                    mode: Mode.DIALOG,
                                                     items: clampController
                                                         .myZones!.values
                                                         .map((zone) => zone)
@@ -400,7 +398,6 @@ class _clampVehicleState extends State<clampVehicle> {
                                                 // Location Dropdown (enabled only when a zone is selected)
                                                 if (clampController.locations != null)
                                                   DropdownSearch<Location>(
-                                                      mode: Mode.DIALOG,
                                                       items: clampController.locations,
                                                       selectedItem : clampController.selectedLocation,
                                                       itemAsString: (location) => location?.locationName ?? '',
@@ -546,8 +543,6 @@ class _clampVehicleState extends State<clampVehicle> {
   }
   Widget createDisabledDropdownSearch(String hintText, double fontSize) {
     return DropdownSearch<String>(
-      mode: Mode.MENU,
-      showSelectedItems: true,
       items: [],
       dropdownSearchDecoration: InputDecoration(
         disabledBorder: OutlineInputBorder(
@@ -559,9 +554,6 @@ class _clampVehicleState extends State<clampVehicle> {
         hintText: hintText,
         hintStyle: GoogleFonts.manrope(fontSize: fontSize),
       ),
-      onChanged: print,
-      maxHeight: 130,
-      popupBackgroundColor: Colors.grey[200],
       enabled: false,
     );
   }

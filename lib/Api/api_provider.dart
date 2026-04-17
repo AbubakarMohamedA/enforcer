@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:enforcer/Screens/Parking/clampVehicle.dart';
 import 'package:flutter/foundation.dart';
+import 'package:collection/collection.dart';
 
 import '../Models/HawkersModel/checkHawkerStatus.dart';
 import '../Models/HawkersModel/getCategoriesModel.dart';
@@ -20,10 +21,17 @@ import '../Models/Offloading/getPenaltyRates.dart';
 import '../Models/userModel.dart';
 import '../Screens/Parking/Models/vehicleCategoriesModel.dart';
 import '../Screens/Parking/Models/zonesModel.dart';
+import '../Models/MarketEntryModel/getMarketTollTypes.dart';
+import '../Models/MarketEntryModel/getMarketTollCategories.dart';
+import '../Models/MarketEntryModel/getMarketStats.dart';
+import '../Models/MarketEntryModel/paidMarket.dart';
 import 'endpoints.dart';
 
 class ApiProvider {
   final Dio dio = Dio();
+  
+  // Cache for Market categories to facilitate UI mapping and lookup of isIdNumber
+  static List<MarketTollCategoryDatum>? _marketCategoriesCache;
 
   Future<Map<String, dynamic>> staffLogin({
     required String email,
@@ -35,50 +43,62 @@ class ApiProvider {
     print("The pass is $password");
 
     try {
-      FormData formData = FormData.fromMap({
+      final payload = {
+        'appType': 'login',
         'email': email,
         'password': password,
-      });
+      };
 
-      print("The form data is ${formData.fields}");
+      print("The Login Payload is: $payload");
 
       result = await Dio().post(
-        "https://eportal.mombasa.go.ke/mobile/android/staff/loginV2.php",
-        // Endpoints.LOGIN_URL, // Replace with your actual endpoint
+        Endpoints.MARKET_URL,
         options: Options(
           preserveHeaderCase: true,
           headers: {
-            'Content-Type': 'application/json', // Set content type to JSON
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'ngrok-skip-browser-warning': 'true', // Bypass ngrok warning page
           },
         ),
-        data: formData,
+        data: payload,
       );
 
-      print("The RESULT IS: ${jsonEncode(result.data)}");
+      print("The RESULT IS: ${result.data}");
 
       if (kDebugMode) {
         print('The Login result is $result');
-        print('The result is ${result.statusCode}');
+        print('The result status is ${result.statusCode}');
       }
-      if (result.statusCode != 200) throw Exception();
-      return jsonDecode(result.data);
-    } on SocketException {
-      throw const SocketException('Bad Internet');
-    } on FormatException catch (e) {
-      throw FormatException(e.toString());
-    } on DioError catch (e) {
-      if (e.error is SocketException) {
-        print('SocketException: ${e.error}');
-        throw Exception('Connection error');
+
+      if (result.statusCode != 200) {
+        throw Exception('Server returned ${result.statusCode}');
+      }
+
+      // Dio automatically decodes JSON if the response header is application/json
+      if (result.data is Map<String, dynamic>) {
+        return result.data;
+      } else if (result.data is String) {
+        return jsonDecode(result.data);
       } else {
-        print('DioError: $e');
-        if (e.response != null) {
-          print('DioError Response: ${e.response!.statusCode}, ${e.response!.data}');
-          throw Exception(e.response!.data['message']);
-        } else {
-          throw Exception('Unknown error');
-        }
+        throw Exception('Unexpected response format');
       }
+    } on SocketException {
+      throw const SocketException('Bad Internet Connection');
+    } on FormatException catch (e) {
+      throw FormatException('Invalid Server Response: $e');
+    } on DioException catch (e) {
+      if (e.error is SocketException) {
+        throw Exception('Connection error. Please check your internet.');
+      } else if (e.response != null) {
+        final data = e.response!.data;
+        final message = (data is Map) ? data['message'] : 'Server error: ${e.response!.statusCode}';
+        throw Exception(message);
+      } else {
+        throw Exception('Connection failed: ${e.message}');
+      }
+    } catch (e) {
+      throw Exception(e.toString());
     }
   }
 
@@ -124,23 +144,27 @@ class ApiProvider {
       //   }
       // }
 
-      if (kDebugMode) {
+      if (kDebugMode && result != null) {
         print('The  result is $result');
         print('The result is ${result.statusCode}');
       }
 
-      if (result.statusCode != 200) throw Exception();
-      // if (result.data is Map<String, dynamic>) {
-      //   return result.data as Map<String, dynamic>;
-      // } else {
-      //   throw Exception("Invalid response format");
-      // }
-      return jsonDecode(result.data);
+      if (result?.statusCode == 200) {
+        if (result!.data is Map<String, dynamic>) {
+          return result.data as Map<String, dynamic>;
+        } else if (result.data is String) {
+          return jsonDecode(result.data);
+        } else {
+          return {"status": "success"};
+        }
+      } else {
+        throw Exception('Server error: ${result?.statusCode}');
+      }
     } on SocketException {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -240,18 +264,18 @@ class ApiProvider {
 
       print("The RESULT IS: ${result}");
 
-      if (kDebugMode) {
+      if (kDebugMode && result != null) {
         print('The Login result is $result');
         print('The result is ${result.statusCode}');
       }
 
-      if (result.statusCode != 200 ) throw Exception();
+      if (result?.statusCode != 200) throw Exception();
 
     } on SocketException {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -269,7 +293,8 @@ class ApiProvider {
       }
     }
 
-    return jsonDecode(result.data);
+    if (result == null) throw Exception("Failed to get response from server");
+    return (result.data is String) ? jsonDecode(result.data) : result.data;
   }
 
   //CHECK HAWKER STATISTICS - I.E Daily paid , Monthly Paid et.c
@@ -309,7 +334,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -365,7 +390,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -419,7 +444,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -524,7 +549,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -578,7 +603,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -643,7 +668,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -696,7 +721,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -863,7 +888,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -913,7 +938,7 @@ class ApiProvider {
 //       throw const SocketException('Bad Internet');
 //     } on FormatException catch (e) {
 //       throw FormatException(e.toString());
-//     } on DioError catch (e) {
+//     } on DioException catch (e) {
 //       if (e.error is SocketException) {
 //         print('SocketException: ${e.error}');
 //         throw Exception('Connection error');
@@ -967,7 +992,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1029,7 +1054,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1090,7 +1115,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1151,7 +1176,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1220,7 +1245,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1280,7 +1305,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1345,7 +1370,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -1406,7 +1431,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1463,7 +1488,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1496,18 +1521,18 @@ class ApiProvider {
 
       result = await dio.post('https://eportal.mombasa.go.ke/mobile/android/parking/fetchZones.php');
 
-      if (kDebugMode) {
+      if (kDebugMode && result != null) {
         print('The zones result is ${result.data}');
         print('The zones status code is ${result.statusCode}');
       }
 
       // Check for successful status code
-      if (result.statusCode != 200) {
-        throw Exception('Failed to fetch zones. Status code: ${result.statusCode}');
+      if (result?.statusCode != 200) {
+        throw Exception('Failed to fetch zones. Status code: ${result?.statusCode}');
       }
 
       // Parse data directly since Dio already parses JSON response into a Map
-      final dynamic data = jsonDecode(result.data);
+      final dynamic data = (result!.data is String) ? jsonDecode(result.data) : result.data;
 
       if (data is! Map<String, dynamic>) {
         throw FormatException('Unexpected data format');
@@ -1519,7 +1544,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Please Check Your Internet Connection');
@@ -1535,35 +1560,34 @@ class ApiProvider {
   }
 
 
-  Future<List<GetVehicleCategoriesModel>> getVehicleCategories () async {
-    Response response;
-    try{
-
+  Future<List<GetVehicleCategoriesModel>> getVehicleCategories() async {
+    Response? response;
+    try {
       FormData formData = FormData.fromMap({
-        "secKey" : '${Endpoints.SEC_KEY}'
+        "secKey": '${Endpoints.SEC_KEY}'
       });
 
       response = await dio.post("${Endpoints.VEHICLE_CATEGORIES}", data: formData);
 
-      if(response.statusCode != 200){
-        throw Exception();
+      if (response.statusCode != 200) {
+        throw Exception('Server error: ${response.statusCode}');
       }
 
-      final List<dynamic> data  = jsonDecode(response.data);
+      final dynamic rawData = response.data;
+      final List<dynamic> data = (rawData is String) ? jsonDecode(rawData) : rawData;
 
       if (kDebugMode) {
-        print('The categories result is ${response.data}');
+        print('The categories result is $rawData');
         print('The categories status code is ${response.statusCode}');
       }
 
-      List<GetVehicleCategoriesModel> vehicleCategories = data.map((vehicle) => GetVehicleCategoriesModel.fromJson(vehicle)).toList();
-      return vehicleCategories;
+      return data.map((json) => GetVehicleCategoriesModel.fromJson(json)).toList();
 
     }on SocketException {
       throw const SocketException('Bad Internet');
     } on FormatException catch (e) {
       throw FormatException(e.toString());
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         // Handle SocketException separately
         print('SocketException: ${e.error}');
@@ -1606,7 +1630,7 @@ class ApiProvider {
       throw const SocketException('Bad Internet connection');
     } on FormatException catch (e) {
       throw FormatException('Bad response format: ${e.message}');
-    } on DioError catch (e) {
+    } on DioException catch (e) {
       if (e.error is SocketException) {
         print('SocketException: ${e.error}');
         throw Exception('Bad Internet connection');
@@ -1630,5 +1654,344 @@ class ApiProvider {
     }
   }
 
+
+  Future<GetMarketTollTypes> getMarketTollTypes({
+    required String? token,
+  }) async  {
+    try {
+      final response = await Dio().get(
+        Endpoints.MARKET_URL, // Using the new MARKET_URL
+        queryParameters: {
+          'appType' : 'getCategories', // New appType as per request
+        },
+        options: Options(
+          preserveHeaderCase: true,
+          contentType: Headers.jsonContentType,
+          headers: {
+            'Authorization': 'Bearer ${token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = response.data;
+        // Parse all categories and cache them
+        GetMarketTollCategories allCategories = GetMarketTollCategories.fromJson(jsonData);
+        _marketCategoriesCache = allCategories.data;
+
+        // Extract unique "types" from categories to satisfy existing UI "Toll Type" dropdown
+        final uniqueTypes = _marketCategoriesCache!
+            .map((e) => e.toJson()['type'] ?? (e.name?.split(' ').first ?? 'Other')) // Fallback logic if needed
+            // Actually, the new API has a "type" field in it. Let's use the raw JSON "type"
+            .toSet() 
+            .toList();
+        
+        // Re-extracting properly from raw data to be sure
+        final List<dynamic> rawData = jsonData['data'] ?? [];
+        final typesSet = rawData.map((e) => e['type'].toString()).toSet().toList();
+
+        final typesData = typesSet.asMap().entries.map((e) => MarketTollTypeDatum(
+          id: e.key + 1, 
+          name: e.key < typesSet.length ? typesSet[e.key] : 'Other'
+        )).toList();
+
+        return GetMarketTollTypes(status: 'success', data: typesData);
+      } else {
+        throw Exception();
+      }
+    } on SocketException {
+      throw const SocketException('Bad Internet');
+    } on FormatException catch (e) {
+      throw FormatException(e.toString());
+    } on DioException catch (e) {
+      if (e.error is SocketException) {
+        throw Exception('Connection error');
+      } else {
+        throw Exception(e.response?.data['message'] ?? 'Please check your Connection');
+      }
+    }
+  }
+
+  Future<GetMarketTollCategories> getMarketTollCategories({
+    required String? token,
+    required String? typeId,
+  }) async  {
+    // The UI passes typeId (1, 2, 3...) which we generated in getMarketTollTypes
+    // We need to filter our cached categories by the corresponding type name.
+    
+    if (_marketCategoriesCache == null) {
+      await getMarketTollTypes(token: token);
+    }
+
+    try {
+      // Get the type name from getMarketTollTypes logic (re-running it briefly or using a static list)
+      // For simplicity, we fetch all categories and filter. 
+      // But we need the type name. Since we don't have a static list of names yet, we'll re-derive.
+      
+      final response = await Dio().get(
+        Endpoints.MARKET_URL,
+        queryParameters: {
+          'appType' : 'getCategories',
+        },
+        options: Options(
+          preserveHeaderCase: true,
+          contentType: Headers.jsonContentType,
+          headers: {
+            'Authorization': 'Bearer ${token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        final jsonData = response.data;
+        final List<dynamic> rawData = jsonData['data'] ?? [];
+        final typesSet = rawData.map((e) => e['type'].toString()).toSet().toList();
+        
+        int idx = int.tryParse(typeId ?? '1') ?? 1;
+        String selectedTypeName = (idx > 0 && idx <= typesSet.length) ? typesSet[idx - 1] : '';
+
+        final filteredRaw = rawData.where((e) => e['type'] == selectedTypeName).toList();
+        final categories = filteredRaw.map((e) => MarketTollCategoryDatum.fromJson(e)).toList();
+
+        return GetMarketTollCategories(status: 'success', data: categories);
+      } else {
+        throw Exception();
+      }
+    } catch (e) {
+      throw Exception('Failed to load categories');
+    }
+  }
+
+  Future<Map<String, dynamic>> promptMarketEntry({
+    required String? token,
+    required String? plateId,
+    required String? phone,
+    required String? typeId,
+    required String? categoryId,
+    required double? amount,
+  }) async {
+    try {
+      // Determine isIdNumber based on the cached categories or a fresh fetch if necessary
+      bool isIdNumber = false;
+      if (_marketCategoriesCache != null) {
+        final cat = _marketCategoriesCache!.firstWhereOrNull((e) => e.id.toString() == categoryId);
+        if (cat != null) {
+          isIdNumber = cat.isIdNumber == 1;
+        }
+      }
+
+      final response = await Dio().post(
+        Endpoints.MARKET_URL, 
+        data: {
+          'appType' : 'createOrder', 
+          'identifier' : plateId,   
+          'mobile' : phone,
+          'marketId' : 1,           
+          'categoryId' : int.tryParse(categoryId ?? '0') ?? 0,
+          // 'amount' : amount,        
+          'isIdNumber' : isIdNumber,
+        },
+        options: Options(
+          preserveHeaderCase: true,
+          contentType: Headers.jsonContentType,
+          headers: {
+            'Authorization': 'Bearer ${token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        return response.data as Map<String, dynamic>;
+      } else {
+        throw Exception();
+      }
+    } on SocketException {
+      throw const SocketException('Bad Internet');
+    } on FormatException catch (e) {
+      throw FormatException(e.toString());
+    } on DioException catch (e) {
+      if (e.error is SocketException) {
+        throw Exception('Connection error');
+      } else {
+        final data = e.response?.data;
+        final msg = (data is Map) ? data['message'] : null;
+        throw Exception(msg ?? 'Payment request failed. Please check your connection.');
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>> checkMarketPaymentStatus({
+  required String? token,
+  required String? orderId, // 👈 pass orderId from promptMarketEntry response
+}) async {
+  try {
+    final response = await Dio().get(
+      Endpoints.MARKET_URL,
+      queryParameters: {
+        'appType': 'checkPaymentStatus',
+        'orderId': orderId, // e.g. "MKTE-000042"
+      },
+      options: Options(
+        preserveHeaderCase: true,
+        contentType: Headers.jsonContentType,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final data = response.data;
+      // Response shape:
+      // {
+      //   "status": "success",
+      //   "orderStatus": "Completed",
+      //   "message": "Payment successful",
+      //   "receiptNo": "TESTING",
+      //   "updatedAt": "2026-04-15 20:47:25"
+      // }
+      if (data['status'] == 'success' && data['orderStatus'] == 'Completed') {
+        return {
+          "status": "success",
+          "data": "Completed",
+          "receiptNo": data['receiptNo'] ?? '',
+          "updatedAt": data['updatedAt'] ?? '',
+          "message": data['message'] ?? '',
+        };
+      }
+
+      return {
+        "status": "success",
+        "data": "Pending",
+      };
+    } else {
+      throw Exception('Unexpected status code: ${response.statusCode}');
+    }
+  } on SocketException {
+    throw const SocketException('Bad Internet');
+  } on FormatException catch (e) {
+    throw FormatException(e.toString());
+  } on DioException catch (e) {
+    if (e.error is SocketException) {
+      throw Exception('Connection error');
+    } else {
+      return {"status": "success", "data": "Pending"};
+    }
+  }
+}
+
+  // CHECK MARKET STATISTICS
+  Future<GetMarketStats> getMarketStats({
+  required String? token,
+}) async {
+  try {
+    final response = await dio.get(
+      Endpoints.MARKET_URL,
+      queryParameters: {
+        'appType': 'getDailyTickets', // 👈 same endpoint as getPaidMarket
+      },
+      options: Options(
+        preserveHeaderCase: true,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'ngrok-skip-browser-warning': 'true',
+        },
+      ),
+    );
+
+    if (response.statusCode == 200) {
+      final rawData = response.data;
+
+      if (rawData == null || rawData is! Map || rawData['status'] != 'success') {
+        return GetMarketStats.fromJson({
+          "status": "success",
+          "daily_stats":   {"paid_market": "0", "total_amount": "0.00"},
+          "monthly_stats": {"paid_market": "0", "total_amount": "0.00"},
+        });
+      }
+
+      final List<dynamic> tickets = rawData['tickets'] ?? []; // 👈 was 'data'
+
+      // Sum amounts from charge field
+      double totalAmount = tickets.fold(0.0, (sum, e) =>
+          sum + (double.tryParse(e['charge']?.toString() ?? '0') ?? 0.0));
+
+      return GetMarketStats.fromJson({
+        "status": "success",
+        "daily_stats": {
+          "paid_market":  tickets.length.toString(), // 👈 count of tickets
+          "total_amount": totalAmount.toStringAsFixed(2),
+        },
+        "monthly_stats": {
+          "paid_market":  tickets.length.toString(),
+          "total_amount": totalAmount.toStringAsFixed(2),
+        },
+      });
+    } else {
+      throw Exception();
+    }
+  } on SocketException {
+    throw const SocketException('Bad Internet');
+  } on FormatException catch (e) {
+    throw FormatException(e.toString());
+  } on DioException catch (e) {
+    if (e.error is SocketException) {
+      throw Exception('Connection error');
+    } else {
+      throw Exception(e.response?.data['message'] ?? 'Please check your Connection');
+    }
+  }
+}
+  Future<PaidMarket> getPaidMarket({
+    required String? token,
+  }) async {
+    try {
+      final response = await Dio().get(
+        Endpoints.MARKET_URL, 
+        queryParameters: {
+          'appType' : 'getDailyTickets',
+        },
+        options: Options(
+          preserveHeaderCase: true,
+          contentType: Headers.jsonContentType,
+          headers: {
+            'Authorization': 'Bearer ${token}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200) {
+        if (response.data == null || response.data is String) {
+          return PaidMarket(status: 'success', data: []);
+        }
+        final jsonData = response.data;
+        return PaidMarket.fromJson(jsonData);
+      } else {
+        throw Exception();
+      }
+    } on SocketException {
+      throw const SocketException('Bad Internet');
+    } on FormatException catch (e) {
+      throw FormatException(e.toString());
+    } on DioException catch (e) {
+      if (e.error is SocketException) {
+        throw Exception('Connection error');
+      } else {
+        throw Exception(e.response?.data['message'] ?? 'Please check your Connection');
+      }
+    }
+  }
 
 }
