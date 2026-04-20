@@ -34,24 +34,33 @@ jobs:
 
       # 4.5. Patch incompatible pub cache packages
       # Replicates local pub cache fixes so CI doesn't need source code changes.
-      # dropdown_search 3.0.1 uses deprecated TextTheme getters removed in Flutter 3.x.
-      # simple_animations 4.2.0 has a type incompatibility fixed in 5.x (handled via override).
+      # dropdown_search 3.0.1 uses deprecated TextTheme getters removed in Flutter 3.x
+      # and isAlwaysShown renamed to thumbVisibility.
+      # simple_animations 4.2.0 has a ValueListenable/ValueNotifier type mismatch
+      # due to a Flutter SDK change in TickerMode.getNotifier return type.
       - name: Patch pub cache packages
         run: |
           PUB_CACHE=$HOME/.pub-cache/hosted/pub.dev
 
           # --- dropdown_search 3.0.1 ---
-          # Fix subtitle2 -> bodySmall
           sed -i '' 's/textTheme\.subtitle2/textTheme.bodySmall/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/dropdown_search.dart"
-
-          # Fix subtitle1 -> titleMedium
           sed -i '' 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/dropdown_search.dart"
           sed -i '' 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
           sed -i '' 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/popupMenu.dart"
+          sed -i '' 's/isAlwaysShown/thumbVisibility/g' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
+          sed -i '' 's/isAlwaysShown/thumbVisibility/g' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
+
+          # --- simple_animations 4.2.0 ---
+          sed -i '' 's/ValueListenable<bool>? _tickerModeNotifier/ValueNotifier<bool>? _tickerModeNotifier/g' \
+            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
+          sed -i '' 's/final ValueListenable<bool> newNotifier/final ValueNotifier<bool> newNotifier/g' \
+            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
 
           echo "✅ Pub cache patches applied"
 
