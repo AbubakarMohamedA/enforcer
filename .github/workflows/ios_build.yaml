@@ -112,11 +112,11 @@ jobs:
             | grep -A1 '<key>Name</key>' | tail -1
 
       # 9. Build IPA
-      # Strategy: run flutter build ipa --no-codesign first so Flutter can perform
-      # its project migrations (AppFrameworkInfo, Podfile, UIScene, etc.) without
-      # failing on missing certificates. Then archive and export manually with
-      # xcodebuild, injecting signing settings at the command line where they
-      # survive Flutter's project file regeneration.
+      # Calls xcodebuild directly instead of flutter build ios/ipa to avoid
+      # Flutter's project migration phase which resets signing settings on every
+      # run. CocoaPods was already run in step 5, so the workspace is ready.
+      # Signing flags passed at the xcodebuild command line always override
+      # whatever is written in project.pbxproj.
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
@@ -126,13 +126,8 @@ jobs:
           security default-keychain -s build.keychain
           security list-keychains -d user -s build.keychain login.keychain
 
-          # Step A: Let Flutter migrate the project without needing certificates.
-          # This handles AppFrameworkInfo.plist, Podfile, UIScene lifecycle, etc.
-          # --no-codesign skips signing so the migration doesn't fail on cert lookup.
-          flutter build ios --release --no-codesign
-
-          # Step B: Archive with full signing settings passed at the xcodebuild level.
-          # These flags override whatever Flutter wrote into project.pbxproj.
+          # Archive directly with xcodebuild — bypasses Flutter's migration
+          # which was resetting signing settings on every run.
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -143,9 +138,11 @@ jobs:
             CODE_SIGN_IDENTITY="Apple Distribution: TECHBIZ LIMITED (45XP48S67P)" \
             PROVISIONING_PROFILE_SPECIFIER="Enforcer App Store Profile" \
             DEVELOPMENT_TEAM=45XP48S67P \
-            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain"
+            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
+            FLUTTER_BUILD_NUMBER=${{ env.BUILD_NUMBER }} \
+            FLUTTER_BUILD_NAME=${{ env.VERSION }}
 
-          # Step C: Export the archive to an IPA using ExportOptions.plist
+          # Export archive to IPA using ExportOptions.plist
           xcodebuild \
             -exportArchive \
             -archivePath build/ios/archive/Runner.xcarchive \
