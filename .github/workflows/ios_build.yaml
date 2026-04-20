@@ -42,15 +42,15 @@ jobs:
 
           # --- dropdown_search 3.0.1 ---
           # Fix subtitle2 -> bodySmall
-          sed -i 's/textTheme\.subtitle2/textTheme.bodySmall/g' \
+          sed -i '' 's/textTheme\.subtitle2/textTheme.bodySmall/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/dropdown_search.dart"
 
           # Fix subtitle1 -> titleMedium
-          sed -i 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
+          sed -i '' 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/dropdown_search.dart"
-          sed -i 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
+          sed -i '' 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
-          sed -i 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
+          sed -i '' 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/popupMenu.dart"
 
           echo "✅ Pub cache patches applied"
