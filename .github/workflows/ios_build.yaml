@@ -61,12 +61,6 @@ jobs:
           sed -i '' '/showTrackOnHover/d' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
 
-          # --- simple_animations 4.2.0 ---
-          # Cast the return value since TickerMode.getNotifier now returns ValueNotifier
-          sed -i '' 's/ValueListenable<bool> newNotifier = TickerMode.getNotifier(context)/ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context) as ValueNotifier<bool>/g' \
-            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
-          sed -i '' 's/ValueListenable<bool>? _tickerModeNotifier/ValueNotifier<bool>? _tickerModeNotifier/g' \
-            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
           echo "✅ Pub cache patches applied"
 
       # 5. Install CocoaPods dependencies
