@@ -79,7 +79,7 @@ jobs:
           echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
 
           # Verify the decoded file is a valid .p12
-          echo "Certificate file size: $(stat -c%s certificate.p12) bytes"
+          echo "Certificate file size: $(wc -c < certificate.p12) bytes"
           openssl pkcs12 -in certificate.p12 -noout -passin pass:"$CERTIFICATE_PASSWORD" 2>&1 && \
             echo "✅ Certificate is valid" || echo "❌ Certificate is invalid or password is wrong"
 
@@ -111,53 +111,48 @@ jobs:
           security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision \
             | grep -A1 '<key>Name</key>' | tail -1
 
-      # 9. Configure Xcode signing
-      # Explicitly sets manual signing in the Xcode project so Flutter's build
-      # command uses our imported certificate instead of looking for automatic signing.
-      - name: Configure Xcode signing
+      # 9. Build IPA
+      # Strategy: run flutter build ipa --no-codesign first so Flutter can perform
+      # its project migrations (AppFrameworkInfo, Podfile, UIScene, etc.) without
+      # failing on missing certificates. Then archive and export manually with
+      # xcodebuild, injecting signing settings at the command line where they
+      # survive Flutter's project file regeneration.
+      - name: Build IPA
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Set CODE_SIGN_STYLE to Manual in the Xcode project
-          /usr/libexec/PlistBuddy \
-            -c "Set :objects:13B07F861A680F5B00A75B9A:attributes:TargetAttributes:13B07F851A680F5B00A75B9A:ProvisioningStyle Manual" \
-            ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || true
+          # Unlock keychain before build
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
 
-          # Apply signing settings via xcodebuild
+          # Step A: Let Flutter migrate the project without needing certificates.
+          # This handles AppFrameworkInfo.plist, Podfile, UIScene lifecycle, etc.
+          # --no-codesign skips signing so the migration doesn't fail on cert lookup.
+          flutter build ios --release --no-codesign
+
+          # Step B: Archive with full signing settings passed at the xcodebuild level.
+          # These flags override whatever Flutter wrote into project.pbxproj.
           xcodebuild \
-            -project ios/Runner.xcodeproj \
-            -target Runner \
+            -workspace ios/Runner.xcworkspace \
+            -scheme Runner \
             -configuration Release \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            archive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution: TECHBIZ LIMITED (45XP48S67P)" \
             PROVISIONING_PROFILE_SPECIFIER="Enforcer App Store Profile" \
             DEVELOPMENT_TEAM=45XP48S67P \
-            -showBuildSettings > /dev/null 2>&1 || true
+            OTHER_CODE_SIGN_FLAGS="--keychain build.keychain"
 
-          echo "Xcode signing configured"
+          # Step C: Export the archive to an IPA using ExportOptions.plist
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/ios/archive/Runner.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/ios/ipa
 
-      # 10. Build the IPA
-      # Signing settings are passed as environment variables which xcodebuild
-      # picks up directly — this survives Flutter's project file regeneration
-      # because env vars are injected at process level, not written to files.
-      - name: Build IPA
-        env:
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-          CODE_SIGN_STYLE: Manual
-          CODE_SIGN_IDENTITY: "Apple Distribution: TECHBIZ LIMITED (45XP48S67P)"
-          PROVISIONING_PROFILE_SPECIFIER: "Enforcer App Store Profile"
-          DEVELOPMENT_TEAM: 45XP48S67P
-          OTHER_CODE_SIGN_FLAGS: "--keychain build.keychain"
-        run: |
-          # Unlock keychain before build
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-
-          # Make build keychain the default and ensure it is in the search list
-          security default-keychain -s build.keychain
-          security list-keychains -d user -s build.keychain login.keychain
-
-          flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist
-
-      # 11. Save IPA as artifact (useful for debugging if upload fails)
+      # 10. Save IPA as artifact (useful for debugging if upload fails)
       - name: Upload IPA artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -166,7 +161,7 @@ jobs:
           path: build/ios/ipa/*.ipa
           retention-days: 7
 
-      # 12. Install Apple Transporter
+      # 11. Install Apple Transporter
       # Downloaded directly from Apple — no Mac App Store sign-in required,
       # fully CI-safe, and always pulls the latest stable version.
       - name: Install Apple Transporter
@@ -176,7 +171,7 @@ jobs:
           cp -R "/Volumes/Transporter/Transporter.app" /Applications/
           hdiutil detach "/Volumes/Transporter" -quiet
 
-      # 13. Upload to App Store Connect via Transporter CLI
+      # 12. Upload to App Store Connect via Transporter CLI
       # iTMSTransporter is Apple's official, standalone, versioned delivery tool.
       # It reads app metadata (bundle ID, version, build number) directly from
       # the .ipa — no risk of mismatch with manually passed values.
@@ -215,7 +210,7 @@ jobs:
             -apiIssuer "$APP_STORE_ISSUER_ID" \
             -v detailed
 
-      # 14. Cleanup keychain (always runs, even on failure)
+      # 13. Cleanup keychain (always runs, even on failure)
       - name: Cleanup keychain
         if: always()
         run: security delete-keychain build.keychain
