@@ -135,23 +135,27 @@ jobs:
           echo "Xcode signing configured"
 
       # 10. Build the IPA
-      # Unlocks the keychain again before build in case it timed out.
-      # Signing flags are passed directly to xcodebuild via --dart-define
-      # because Flutter regenerates Xcode project files before building,
-      # which wipes any signing config set in a prior step.
+      # Signing settings are passed as environment variables which xcodebuild
+      # picks up directly — this survives Flutter's project file regeneration
+      # because env vars are injected at process level, not written to files.
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution: TECHBIZ LIMITED (45XP48S67P)"
+          PROVISIONING_PROFILE_SPECIFIER: "Enforcer App Store Profile"
+          DEVELOPMENT_TEAM: 45XP48S67P
+          OTHER_CODE_SIGN_FLAGS: "--keychain build.keychain"
         run: |
           # Unlock keychain before build
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
+          # Make build keychain the default and ensure it is in the search list
+          security default-keychain -s build.keychain
+          security list-keychains -d user -s build.keychain login.keychain
+
           flutter build ipa --release \
-            --export-options-plist=ios/ExportOptions.plist \
-            --dart-define=FLUTTER_XCODE_CODE_SIGN_STYLE=Manual \
-            --dart-define=FLUTTER_XCODE_CODE_SIGN_IDENTITY="Apple Distribution: TECHBIZ LIMITED (45XP48S67P)" \
-            --dart-define=FLUTTER_XCODE_PROVISIONING_PROFILE_SPECIFIER="Enforcer App Store Profile" \
-            --dart-define=FLUTTER_XCODE_DEVELOPMENT_TEAM=45XP48S67P
+            --export-options-plist=ios/ExportOptions.plist
 
       # 11. Save IPA as artifact (useful for debugging if upload fails)
       - name: Upload IPA artifact
