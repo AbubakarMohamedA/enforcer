@@ -15,8 +15,6 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. Read Flutter version from .flutter-version file
-      # This ensures CI always uses the same Flutter version as local development.
-      # To upgrade Flutter, update .flutter-version and push — no workflow changes needed.
       - name: Read Flutter version
         run: |
           FLUTTER_VERSION=$(cat .flutter-version)
@@ -34,15 +32,30 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
+      # 4.5. Patch incompatible pub cache packages
+      # Replicates local pub cache fixes so CI doesn't need source code changes.
+      # dropdown_search 3.0.1 uses deprecated TextTheme getters removed in Flutter 3.x.
+      # simple_animations 4.2.0 has a type incompatibility fixed in 5.x (handled via override).
+      - name: Patch pub cache packages
+        run: |
+          PUB_CACHE=$HOME/.pub-cache/hosted/pub.dev
+
+          # --- dropdown_search 3.0.1 ---
+          # Fix subtitle2 -> bodySmall
+          sed -i 's/textTheme\.subtitle2/textTheme.bodySmall/g' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/dropdown_search.dart"
+
+          # Fix subtitle1 -> titleMedium
+          sed -i 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/dropdown_search.dart"
+          sed -i 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
+          sed -i 's/textTheme\.subtitle1/textTheme.titleMedium/g' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/popupMenu.dart"
+
+          echo "✅ Pub cache patches applied"
+
       # 5. Install CocoaPods dependencies
-      # Podfile.lock is deleted before install because it pins an older Firebase
-      # version that conflicts with the current flutter plugin requirements.
-      # --repo-update refreshes the spec repo so the latest versions are resolved.
-      #
-      # IMPORTANT: The ios/Podfile must contain a post_install hook that sets
-      # CODE_SIGNING_ALLOWED = NO on all Pod targets. This prevents Xcode 16
-      # from applying the Runner's provisioning profile to Pod targets during
-      # archive, which causes exit code 65. See ios/Podfile for the hook.
       - name: Install CocoaPods
         run: |
           cd ios
@@ -54,42 +67,30 @@ jobs:
       - name: Extract version info
         id: version
         run: |
-          # Build number uses the GitHub run number for uniqueness
           echo "BUILD_NUMBER=$GITHUB_RUN_NUMBER" >> $GITHUB_ENV
-
-          # Marketing version is pulled from pubspec.yaml (e.g. "1.2.3+45" → "1.2.3")
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-
           echo "Building version $VERSION ($GITHUB_RUN_NUMBER)"
 
       # 7. Import signing certificate
-      # Imports the .p12 distribution certificate into a temporary keychain.
-      # Verifies the certificate is valid and shows what was imported for debugging.
       - name: Import Code Signing Certificate
         env:
           CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
           CERTIFICATE_PASSWORD: ${{ secrets.CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Create a temporary keychain isolated from the system keychain
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
-
-          # Add build keychain to the keychain search list so Xcode can find it
           security list-keychains -d user -s build.keychain login.keychain
 
-          # Decode the .p12 certificate
           echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
 
-          # Verify the decoded file is a valid .p12
           echo "Certificate file size: $(wc -c < certificate.p12) bytes"
           openssl pkcs12 -in certificate.p12 -noout -passin pass:"$CERTIFICATE_PASSWORD" 2>&1 && \
             echo "✅ Certificate is valid" || echo "❌ Certificate is invalid or password is wrong"
 
-          # Import certificate into the keychain
           security import certificate.p12 \
             -k build.keychain \
             -P "$CERTIFICATE_PASSWORD" \
@@ -99,7 +100,6 @@ jobs:
             -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
-          # Verify certificate was imported successfully
           echo "Certificates available for code signing:"
           security find-identity -v -p codesigning build.keychain
 
@@ -112,35 +112,24 @@ jobs:
           echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode \
             > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
-          # Verify profile was installed and show its name
           echo "Installed provisioning profile:"
           security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision \
             | grep -A1 '<key>Name</key>' | tail -1
 
       # 9. Build IPA
-      # Pod targets have CODE_SIGNING_ALLOWED = NO written into their build
-      # settings by the post_install hook in ios/Podfile, so they will never
-      # attempt to use a provisioning profile regardless of what xcodebuild
-      # receives. Only the Runner target is signed, via an xcconfig file.
-      #
-      # The profile UUID is extracted directly from the decoded .mobileprovision
-      # file using plutil so it is always the real UUID.
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          # Unlock keychain before build
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security list-keychains -d user -s build.keychain login.keychain
 
-          # Extract UUID directly from the provisioning profile
           PROFILE_UUID=$(security cms -D \
             -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision \
             | plutil -extract UUID raw -)
           echo "Using profile UUID: $PROFILE_UUID"
 
-          # Write signing settings to an xcconfig file scoped to Runner only
           cat > /tmp/signing_override.xcconfig << EOF
           CODE_SIGN_STYLE = Manual
           CODE_SIGN_IDENTITY = Apple Distribution: TECHBIZ LIMITED (45XP48S67P)
@@ -151,7 +140,6 @@ jobs:
           FLUTTER_BUILD_NAME = ${{ env.VERSION }}
           EOF
 
-          # Archive — Pod targets ignore signing due to post_install hook in Podfile
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -162,14 +150,13 @@ jobs:
             OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
             archive
 
-          # Export archive to IPA using ExportOptions.plist
           xcodebuild \
             -exportArchive \
             -archivePath build/ios/archive/Runner.xcarchive \
             -exportOptionsPlist ios/ExportOptions.plist \
             -exportPath build/ios/ipa
 
-      # 10. Save IPA as artifact (useful for debugging if upload fails)
+      # 10. Save IPA as artifact
       - name: Upload IPA artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -179,8 +166,6 @@ jobs:
           retention-days: 7
 
       # 11. Install Apple Transporter
-      # Downloaded directly from Apple — no Mac App Store sign-in required,
-      # fully CI-safe, and always pulls the latest stable version.
       - name: Install Apple Transporter
         run: |
           curl -O https://itmstransporter.itunes.apple.com/downloads/Transporter-latest.dmg
@@ -189,10 +174,6 @@ jobs:
           hdiutil detach "/Volumes/Transporter" -quiet
 
       # 12. Upload to App Store Connect via Transporter CLI
-      # iTMSTransporter is Apple's official, standalone, versioned delivery tool.
-      # It reads app metadata (bundle ID, version, build number) directly from
-      # the .ipa — no risk of mismatch with manually passed values.
-      # API key auth is Apple's current recommended method and is not deprecated.
       - name: Upload to App Store Connect
         env:
           APP_STORE_API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
@@ -200,12 +181,10 @@ jobs:
           APP_STORE_API_KEY_BASE64: ${{ secrets.APP_STORE_API_KEY_BASE64 }}
           APP_APPLE_ID: ${{ vars.APP_APPLE_ID }}
         run: |
-          # Decode the App Store Connect API key (.p8)
           mkdir -p ~/.appstoreconnect/private_keys
           echo "$APP_STORE_API_KEY_BASE64" | base64 --decode \
             > ~/.appstoreconnect/private_keys/AuthKey_${APP_STORE_API_KEY_ID}.p8
 
-          # Extract bundle ID from the Xcode project file
           BUNDLE_ID=$(grep -m 1 'PRODUCT_BUNDLE_IDENTIFIER' \
             ios/Runner.xcodeproj/project.pbxproj \
             | awk -F '= ' '{print $2}' \
@@ -215,11 +194,6 @@ jobs:
           echo "Detected bundle ID: $BUNDLE_ID"
           echo "Uploading version $VERSION build $BUILD_NUMBER"
 
-          # -m upload    → delivery mode
-          # -f           → path to the .ipa
-          # -apiKey      → App Store Connect API key ID
-          # -apiIssuer   → App Store Connect issuer ID
-          # -v detailed  → verbose logging
           /Applications/Transporter.app/Contents/itms/bin/iTMSTransporter \
             -m upload \
             -f build/ios/ipa/*.ipa \
@@ -227,7 +201,7 @@ jobs:
             -apiIssuer "$APP_STORE_ISSUER_ID" \
             -v detailed
 
-      # 13. Cleanup keychain (always runs, even on failure)
+      # 13. Cleanup keychain
       - name: Cleanup keychain
         if: always()
         run: |
