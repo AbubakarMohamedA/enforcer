@@ -38,7 +38,7 @@ jobs:
       - name: Install CocoaPods
         run: |
           cd ios
-          pod install
+          pod install --repo-update
 
       # 6. Extract version info from pubspec.yaml
       - name: Extract version info
