@@ -47,5 +47,15 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+
+	<!-- Privacy purpose strings required by Apple -->
+	<key>NSCameraUsageDescription</key>
+	<string>Enforcer uses the camera to automatically read and capture vehicle number plates, eliminating the need to type them manually during enforcement operations.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Enforcer accesses your photo library to attach evidence images to enforcement records.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Enforcer saves captured number plate images to your photo library as evidence for enforcement records.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Enforcer requires microphone access as part of the camera framework used to capture vehicle number plates.</string>
 </dict>
 </plist>

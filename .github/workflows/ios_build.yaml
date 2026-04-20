@@ -7,9 +7,15 @@ on:
 
 jobs:
   build-and-upload:
-    runs-on: macos-latest
+    runs-on: macos-15
 
     steps:
+      # 1.5. Select Xcode 26
+      - name: Select Xcode 26.4.1
+        run: |
+          sudo xcode-select -s /Applications/Xcode_26.4.1.app/Contents/Developer
+          xcodebuild -version
+
       # 1. Checkout code
       - name: Checkout repository
         uses: actions/checkout@v5
