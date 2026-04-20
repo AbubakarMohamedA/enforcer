@@ -1,6 +1,5 @@
 # Set the minimum iOS deployment target
-platform :ios, '16.0'  # Change from 15.5.0 to 16.0
-
+platform :ios, '16.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -35,9 +34,8 @@ target 'Runner' do
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 
   # Force nanopb version to avoid conflicts
-    pod 'nanopb', '~> 3.30910.0'
-    pod 'PhoneNumberKit', '~> 3.7.8'
-
+  pod 'nanopb', '~> 3.30910.0'
+  pod 'PhoneNumberKit', '~> 3.7.8'
 
   target 'RunnerTests' do
     inherit! :search_paths
@@ -47,24 +45,35 @@ end
 post_install do |installer|
 
   installer.pods_project.build_configurations.each do |config|
-      config.build_settings["EXCLUDED_ARCHS[sdk=*]"] = "armv7"
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
-    end
+    config.build_settings["EXCLUDED_ARCHS[sdk=*]"] = "armv7"
+    config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
+  end
+
   installer.pods_project.targets.each do |target|
-   if target.name == 'BoringSSL-GRPC'
-        target.source_build_phase.files.each do |file|
-          if file.settings && file.settings['COMPILER_FLAGS']
-            flags = file.settings['COMPILER_FLAGS'].split
-            flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
-            file.settings['COMPILER_FLAGS'] = flags.join(' ')
-          end
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          flags = file.settings['COMPILER_FLAGS'].split
+          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
+          file.settings['COMPILER_FLAGS'] = flags.join(' ')
         end
       end
+    end
+
     flutter_additional_ios_build_settings(target)
+
     target.build_configurations.each do |config|
-        if Gem::Version.new($iOSVersion) > Gem::Version.new(config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'])
-          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
-        end
+      # Fix deployment target
+      if Gem::Version.new($iOSVersion) > Gem::Version.new(config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'])
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = $iOSVersion
       end
+
+      # Disable code signing for all Pod targets so Xcode doesn't try to
+      # apply the Runner's provisioning profile to them (causes exit code 65)
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
+      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
+      config.build_settings['CODE_SIGN_IDENTITY'] = ''
+      config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
+    end
   end
 end
