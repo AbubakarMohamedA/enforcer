@@ -34,8 +34,8 @@ jobs:
 
       # 4.5. Patch incompatible pub cache packages
       # Replicates local pub cache fixes so CI doesn't need source code changes.
-      # dropdown_search 3.0.1 uses deprecated TextTheme getters removed in Flutter 3.x
-      # and isAlwaysShown renamed to thumbVisibility.
+      # dropdown_search 3.0.1 uses deprecated TextTheme getters removed in Flutter 3.x,
+      # isAlwaysShown renamed to thumbVisibility, and showTrackOnHover removed from Scrollbar.
       # simple_animations 4.2.0 has a ValueListenable/ValueNotifier type mismatch
       # due to a Flutter SDK change in TickerMode.getNotifier return type.
       - name: Patch pub cache packages
@@ -55,11 +55,17 @@ jobs:
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
           sed -i '' 's/isAlwaysShown/thumbVisibility/g' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
+          # Remove showTrackOnHover — no longer a valid Scrollbar parameter
+          sed -i '' '/showTrackOnHover/d' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
+          sed -i '' '/showTrackOnHover/d' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
 
           # --- simple_animations 4.2.0 ---
-          sed -i '' 's/ValueListenable<bool>? _tickerModeNotifier/ValueNotifier<bool>? _tickerModeNotifier/g' \
+          # Cast the return value since TickerMode.getNotifier now returns ValueNotifier
+          sed -i '' 's/final ValueListenable<bool> newNotifier = TickerMode.getNotifier(context);/final ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context) as ValueNotifier<bool>;/g' \
             "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
-          sed -i '' 's/final ValueListenable<bool> newNotifier/final ValueNotifier<bool> newNotifier/g' \
+          sed -i '' 's/ValueListenable<bool>? _tickerModeNotifier/ValueNotifier<bool>? _tickerModeNotifier/g' \
             "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
 
           echo "✅ Pub cache patches applied"
