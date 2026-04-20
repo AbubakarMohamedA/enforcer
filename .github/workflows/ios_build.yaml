@@ -34,41 +34,15 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      # 5. Patch Podfile to disable signing on all Pod targets
-      # This is the most reliable way to prevent Pod targets from inheriting
-      # provisioning profile settings from the Runner target during archiving.
-      # Xcode 16 propagates signing settings to all workspace targets regardless
-      # of whether they are passed via command line or xcconfig — the only way
-      # to stop this is to explicitly disable signing in the Pod targets themselves
-      # via a post_install hook written into the Podfile before pod install runs.
-      - name: Patch Podfile with signing disable hook
-        run: |
-          # Only add the hook if it isn't already present
-          if ! grep -q 'CODE_SIGNING_ALLOWED' ios/Podfile; then
-            cat >> ios/Podfile << 'PODFILE_PATCH'
-
-          post_install do |installer|
-            installer.pods_project.targets.each do |target|
-              target.build_configurations.each do |config|
-                config.build_settings['CODE_SIGNING_ALLOWED']          = 'NO'
-                config.build_settings['CODE_SIGNING_REQUIRED']         = 'NO'
-                config.build_settings['CODE_SIGN_IDENTITY']            = ''
-                config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
-              end
-            end
-          end
-          PODFILE_PATCH
-            echo "✅ post_install hook added to Podfile"
-          else
-            echo "ℹ️  post_install hook already present in Podfile"
-          fi
-
-      # 6. Install CocoaPods dependencies
+      # 5. Install CocoaPods dependencies
       # Podfile.lock is deleted before install because it pins an older Firebase
       # version that conflicts with the current flutter plugin requirements.
       # --repo-update refreshes the spec repo so the latest versions are resolved.
-      # The post_install hook added in step 5 runs here and writes
-      # CODE_SIGNING_ALLOWED = NO into every Pod target's build settings.
+      #
+      # IMPORTANT: The ios/Podfile must contain a post_install hook that sets
+      # CODE_SIGNING_ALLOWED = NO on all Pod targets. This prevents Xcode 16
+      # from applying the Runner's provisioning profile to Pod targets during
+      # archive, which causes exit code 65. See ios/Podfile for the hook.
       - name: Install CocoaPods
         run: |
           cd ios
@@ -76,7 +50,7 @@ jobs:
           pod install --repo-update
           echo "✅ CocoaPods install complete"
 
-      # 7. Extract version info from pubspec.yaml
+      # 6. Extract version info from pubspec.yaml
       - name: Extract version info
         id: version
         run: |
@@ -89,7 +63,7 @@ jobs:
 
           echo "Building version $VERSION ($GITHUB_RUN_NUMBER)"
 
-      # 8. Import signing certificate
+      # 7. Import signing certificate
       # Imports the .p12 distribution certificate into a temporary keychain.
       # Verifies the certificate is valid and shows what was imported for debugging.
       - name: Import Code Signing Certificate
@@ -129,7 +103,7 @@ jobs:
           echo "Certificates available for code signing:"
           security find-identity -v -p codesigning build.keychain
 
-      # 9. Install provisioning profile
+      # 8. Install provisioning profile
       - name: Install Provisioning Profile
         env:
           PROVISIONING_PROFILE_BASE64: ${{ secrets.PROVISIONING_PROFILE_BASE64 }}
@@ -143,14 +117,14 @@ jobs:
           security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision \
             | grep -A1 '<key>Name</key>' | tail -1
 
-      # 10. Build IPA
+      # 9. Build IPA
       # Pod targets have CODE_SIGNING_ALLOWED = NO written into their build
-      # settings by the Podfile post_install hook (step 5), so they will never
+      # settings by the post_install hook in ios/Podfile, so they will never
       # attempt to use a provisioning profile regardless of what xcodebuild
-      # receives. Only Runner is signed, using an xcconfig file.
+      # receives. Only the Runner target is signed, via an xcconfig file.
       #
-      # The profile UUID is read directly from the decoded .mobileprovision file
-      # using plutil so it is always accurate.
+      # The profile UUID is extracted directly from the decoded .mobileprovision
+      # file using plutil so it is always the real UUID.
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
@@ -177,7 +151,7 @@ jobs:
           FLUTTER_BUILD_NAME = ${{ env.VERSION }}
           EOF
 
-          # Archive — Pod targets ignore signing due to post_install hook
+          # Archive — Pod targets ignore signing due to post_install hook in Podfile
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
@@ -195,7 +169,7 @@ jobs:
             -exportOptionsPlist ios/ExportOptions.plist \
             -exportPath build/ios/ipa
 
-      # 11. Save IPA as artifact (useful for debugging if upload fails)
+      # 10. Save IPA as artifact (useful for debugging if upload fails)
       - name: Upload IPA artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -204,7 +178,7 @@ jobs:
           path: build/ios/ipa/*.ipa
           retention-days: 7
 
-      # 12. Install Apple Transporter
+      # 11. Install Apple Transporter
       # Downloaded directly from Apple — no Mac App Store sign-in required,
       # fully CI-safe, and always pulls the latest stable version.
       - name: Install Apple Transporter
@@ -214,7 +188,7 @@ jobs:
           cp -R "/Volumes/Transporter/Transporter.app" /Applications/
           hdiutil detach "/Volumes/Transporter" -quiet
 
-      # 13. Upload to App Store Connect via Transporter CLI
+      # 12. Upload to App Store Connect via Transporter CLI
       # iTMSTransporter is Apple's official, standalone, versioned delivery tool.
       # It reads app metadata (bundle ID, version, build number) directly from
       # the .ipa — no risk of mismatch with manually passed values.
@@ -253,7 +227,8 @@ jobs:
             -apiIssuer "$APP_STORE_ISSUER_ID" \
             -v detailed
 
-      # 14. Cleanup keychain (always runs, even on failure)
+      # 13. Cleanup keychain (always runs, even on failure)
       - name: Cleanup keychain
         if: always()
-        run: security delete-keychain build.keychain
+        run: |
+          security delete-keychain build.keychain 2>/dev/null || true
