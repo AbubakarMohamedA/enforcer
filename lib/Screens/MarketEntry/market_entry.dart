@@ -730,26 +730,44 @@ class _MarketEntryState extends State<MarketEntry> with SingleTickerProviderStat
                       _isValidNumber = isValid;
                     });
                   },
+                  selectorButtonOnErrorPadding: 2,
                   selectorConfig: SelectorConfig(
                     selectorType: PhoneInputSelectorType.DROPDOWN,
                     setSelectorButtonAsPrefixIcon: true,
+                    trailingSpace: true,
+                    useEmoji: true,
+                    leadingPadding: 20,
                   ),
                   ignoreBlank: false,
                   autoValidateMode: AutovalidateMode.onUserInteraction,
+                  spaceBetweenSelectorAndTextField: 25,
+                  selectorTextStyle: TextStyle(color: Colors.black),
                   initialValue: _initialPhoneNumber,
                   textFieldController: _phoneController,
                   formatInput: true,
                   errorMessage: 'Please enter a valid phone number',
                   inputDecoration: InputDecoration(
+                    prefixIconColor: Colors.black38,
                     hintStyle: GoogleFonts.manrope(fontSize: fontSize),
                     hintText: '712-256-408',
+                    alignLabelWithHint: false,
                     fillColor: Colors.white,
                     filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: BorderSide(color: Color(0xFF46B1FD)),
+                    ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(14),
                       borderSide: BorderSide(color: Color(0xFF46B1FD)),
                     ),
                   ),
+                  keyboardType: TextInputType.numberWithOptions(signed: true, decimal: true),
+                  inputBorder: OutlineInputBorder(),
+                  onSaved: (PhoneNumber number) {
+                    print('On Saved:');
+                    print(number.phoneNumber);
+                  },
                 ),
                 const SizedBox(height: 25),
 

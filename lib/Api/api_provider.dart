@@ -1896,7 +1896,7 @@ class ApiProvider {
     final response = await dio.get(
       Endpoints.MARKET_URL,
       queryParameters: {
-        'appType': 'getDailyTickets', // 👈 same endpoint as getPaidMarket
+        'appType': 'getStaffStats',
       },
       options: Options(
         preserveHeaderCase: true,
@@ -1920,21 +1920,19 @@ class ApiProvider {
         });
       }
 
-      final List<dynamic> tickets = rawData['tickets'] ?? []; // 👈 was 'data'
-
-      // Sum amounts from charge field
-      double totalAmount = tickets.fold(0.0, (sum, e) =>
-          sum + (double.tryParse(e['charge']?.toString() ?? '0') ?? 0.0));
+      final stats = rawData['stats'] ?? {};
+      final daily = stats['daily'] ?? {};
+      final monthly = stats['monthly'] ?? {};
 
       return GetMarketStats.fromJson({
         "status": "success",
         "daily_stats": {
-          "paid_market":  tickets.length.toString(), // 👈 count of tickets
-          "total_amount": totalAmount.toStringAsFixed(2),
+          "paid_market":  (daily['count'] ?? 0).toString(),
+          "total_amount": double.tryParse(daily['amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? "0.00",
         },
         "monthly_stats": {
-          "paid_market":  tickets.length.toString(),
-          "total_amount": totalAmount.toStringAsFixed(2),
+          "paid_market":  (monthly['count'] ?? 0).toString(),
+          "total_amount": double.tryParse(monthly['amount']?.toString() ?? '0')?.toStringAsFixed(2) ?? "0.00",
         },
       });
     } else {

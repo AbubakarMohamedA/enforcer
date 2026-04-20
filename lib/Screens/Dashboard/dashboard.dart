@@ -646,25 +646,46 @@ class _DashboardState extends State<Dashboard> with SingleTickerProviderStateMix
                                       } else {
                                         switch (originalIndex) {
                                           case 0:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => parking()));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => parking())).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                           case 1:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => psv()));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => psv())).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                           case 2:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => cess()));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => cess())).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                           case 3:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => traffic()));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => traffic())).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                           case 4:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => hawkers(token: token)));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => hawkers(token: token))).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                           case 5:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => offBoarding(token: token)));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => offBoarding(token: token))).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                           case 6:
-                                            Navigator.push(context, MaterialPageRoute(builder: (c) => MarketEntry(token: token)));
+                                            Navigator.push(context, MaterialPageRoute(builder: (c) => MarketEntry(token: token))).then((_) {
+                                              _checkAllPermissions();
+                                              fetchModuleVisibility();
+                                            });
                                             break;
                                         }
                                       }
