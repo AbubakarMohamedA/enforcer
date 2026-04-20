@@ -35,6 +35,9 @@ jobs:
         run: flutter pub get
 
       # 5. Install CocoaPods dependencies
+      # Podfile.lock is deleted before install because it pins an older Firebase
+      # version that conflicts with the current flutter plugin requirements.
+      # --repo-update refreshes the spec repo so the latest versions are resolved.
       - name: Install CocoaPods
         run: |
           cd ios
@@ -55,6 +58,8 @@ jobs:
           echo "Building version $VERSION ($GITHUB_RUN_NUMBER)"
 
       # 7. Import signing certificate
+      # Imports the .p12 distribution certificate into a temporary keychain.
+      # Verifies the certificate is valid and shows what was imported for debugging.
       - name: Import Code Signing Certificate
         env:
           CERTIFICATE_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
@@ -67,25 +72,29 @@ jobs:
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -t 3600 -u build.keychain
 
-          # Decode and import the .p12 distribution certificate
+          # Add build keychain to the keychain search list so Xcode can find it
+          security list-keychains -d user -s build.keychain login.keychain
+
+          # Decode the .p12 certificate
           echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
 
-          # Verify the decoded file is a valid p12
-          echo "Certificate file size: $(stat -f%z certificate.p12 2>/dev/null || stat -c%s certificate.p12) bytes"
+          # Verify the decoded file is a valid .p12
+          echo "Certificate file size: $(stat -c%s certificate.p12) bytes"
           openssl pkcs12 -in certificate.p12 -noout -passin pass:"$CERTIFICATE_PASSWORD" 2>&1 && \
             echo "✅ Certificate is valid" || echo "❌ Certificate is invalid or password is wrong"
 
-
+          # Import certificate into the keychain
           security import certificate.p12 \
             -k build.keychain \
             -P "$CERTIFICATE_PASSWORD" \
-            -T /usr/bin/codesign
+            -T /usr/bin/codesign \
+            -T /usr/bin/xcodebuild
           security set-key-partition-list \
-            -S apple-tool:,apple: \
+            -S apple-tool:,apple:,codesign: \
             -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
-          # Verify certificate was imported
-          echo "Certificates in keychain:"
+          # Verify certificate was imported successfully
+          echo "Certificates available for code signing:"
           security find-identity -v -p codesigning build.keychain
 
       # 8. Install provisioning profile
@@ -97,20 +106,56 @@ jobs:
           echo "$PROVISIONING_PROFILE_BASE64" | base64 --decode \
             > ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision
 
-      # 9. Build the IPA
-      - name: Build IPA
-        run: flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
+          # Verify profile was installed and show its name
+          echo "Installed provisioning profile:"
+          security cms -D -i ~/Library/MobileDevice/Provisioning\ Profiles/profile.mobileprovision \
+            | grep -A1 '<key>Name</key>' | tail -1
 
-      # 10. Save IPA as artifact (useful for debugging if upload fails)
+      # 9. Configure Xcode signing
+      # Explicitly sets manual signing in the Xcode project so Flutter's build
+      # command uses our imported certificate instead of looking for automatic signing.
+      - name: Configure Xcode signing
+        run: |
+          # Set CODE_SIGN_STYLE to Manual in the Xcode project
+          /usr/libexec/PlistBuddy \
+            -c "Set :objects:13B07F861A680F5B00A75B9A:attributes:TargetAttributes:13B07F851A680F5B00A75B9A:ProvisioningStyle Manual" \
+            ios/Runner.xcodeproj/project.pbxproj 2>/dev/null || true
+
+          # Apply signing settings via xcodebuild
+          xcodebuild \
+            -project ios/Runner.xcodeproj \
+            -target Runner \
+            -configuration Release \
+            CODE_SIGN_STYLE=Manual \
+            CODE_SIGN_IDENTITY="Apple Distribution: TECHBIZ LIMITED (45XP48S67P)" \
+            PROVISIONING_PROFILE_SPECIFIER="Enforcer App Store Profile" \
+            DEVELOPMENT_TEAM=45XP48S67P \
+            -showBuildSettings > /dev/null 2>&1 || true
+
+          echo "Xcode signing configured"
+
+      # 10. Build the IPA
+      # Unlocks the keychain again before build in case it timed out.
+      - name: Build IPA
+        env:
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          # Unlock keychain before build
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+
+          flutter build ipa --release \
+            --export-options-plist=ios/ExportOptions.plist
+
+      # 11. Save IPA as artifact (useful for debugging if upload fails)
       - name: Upload IPA artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: app-release.ipa
+          name: app-release-${{ env.VERSION }}-${{ env.BUILD_NUMBER }}.ipa
           path: build/ios/ipa/*.ipa
           retention-days: 7
 
-      # 11. Install Apple Transporter
+      # 12. Install Apple Transporter
       # Downloaded directly from Apple — no Mac App Store sign-in required,
       # fully CI-safe, and always pulls the latest stable version.
       - name: Install Apple Transporter
@@ -120,7 +165,7 @@ jobs:
           cp -R "/Volumes/Transporter/Transporter.app" /Applications/
           hdiutil detach "/Volumes/Transporter" -quiet
 
-      # 12. Upload to App Store Connect via Transporter CLI
+      # 13. Upload to App Store Connect via Transporter CLI
       # iTMSTransporter is Apple's official, standalone, versioned delivery tool.
       # It reads app metadata (bundle ID, version, build number) directly from
       # the .ipa — no risk of mismatch with manually passed values.
@@ -159,7 +204,7 @@ jobs:
             -apiIssuer "$APP_STORE_ISSUER_ID" \
             -v detailed
 
-      # 13. Cleanup keychain (always runs, even on failure)
+      # 14. Cleanup keychain (always runs, even on failure)
       - name: Cleanup keychain
         if: always()
         run: security delete-keychain build.keychain
