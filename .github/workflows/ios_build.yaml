@@ -34,32 +34,15 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      # 5. Install CocoaPods dependencies and disable Pod target signing
+      # 5. Install CocoaPods dependencies
       # Podfile.lock is deleted before install because it pins an older Firebase
       # version that conflicts with the current flutter plugin requirements.
       # --repo-update refreshes the spec repo so the latest versions are resolved.
-      #
-      # After pod install, we patch Pods.xcodeproj/project.pbxproj to clear
-      # PROVISIONING_PROFILE_SPECIFIER and CODE_SIGN_IDENTITY on every Pod target.
-      # Without this patch, xcodebuild leaks the Runner's signing settings into
-      # all Pod targets (Firebase, gRPC, etc.) which don't support provisioning
-      # profiles, causing archive to fail with exit code 65.
-      # pod install regenerates this file on every run so the patch is always fresh.
       - name: Install CocoaPods
         run: |
           cd ios
           rm -f Podfile.lock
           pod install --repo-update
-
-          # Patch all Pod targets to have no provisioning profile or signing identity
-          find Pods/Pods.xcodeproj -name "*.pbxproj" | xargs sed -i '' \
-            's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "";/g'
-          find Pods/Pods.xcodeproj -name "*.pbxproj" | xargs sed -i '' \
-            's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Automatic;/g'
-          find Pods/Pods.xcodeproj -name "*.pbxproj" | xargs sed -i '' \
-            's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "";/g'
-
-          echo "Pod target signing cleared successfully"
 
       # 6. Extract version info from pubspec.yaml
       - name: Extract version info
@@ -129,12 +112,15 @@ jobs:
             | grep -A1 '<key>Name</key>' | tail -1
 
       # 9. Build IPA
-      # Calls xcodebuild directly instead of flutter build ios/ipa to avoid
-      # Flutter's project migration phase which resets signing settings on every
-      # run. CocoaPods was already run in step 5, so the workspace is ready.
-      # Pod target signing was cleared in step 5, so only Runner gets signed.
-      # The -destination flag forces iOS device target so xcodebuild does not
-      # pick "My Mac (Designed for iPad)" as the default destination.
+      # Uses -xcconfig to inject signing settings instead of passing them as
+      # command-line KEY=VALUE arguments. This is the critical distinction:
+      #
+      #   KEY=VALUE on the command line → applies to EVERY target in the workspace,
+      #   including all 50+ Pod targets (Firebase, gRPC, etc.) which don't support
+      #   provisioning profiles → exit code 65.
+      #
+      #   -xcconfig → applies only to the primary scheme target (Runner) →
+      #   Pod targets are unaffected and use their own Automatic signing settings.
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
@@ -144,22 +130,34 @@ jobs:
           security default-keychain -s build.keychain
           security list-keychains -d user -s build.keychain login.keychain
 
-          # Archive with signing scoped to Runner only — Pod targets were
-          # patched to Automatic/empty in step 5 so they are never signed
+          # Find the UUID of the installed provisioning profile
+          PROFILE_UUID=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/ \
+            | head -1 | sed 's/.mobileprovision//')
+          echo "Using profile UUID: $PROFILE_UUID"
+
+          # Write signing settings to an xcconfig file.
+          # -xcconfig applies ONLY to the Runner target, NOT to Pod targets.
+          cat > /tmp/signing_override.xcconfig << EOF
+          CODE_SIGN_STYLE = Manual
+          CODE_SIGN_IDENTITY = Apple Distribution: TECHBIZ LIMITED (45XP48S67P)
+          DEVELOPMENT_TEAM = 45XP48S67P
+          PROVISIONING_PROFILE = $PROFILE_UUID
+          PROVISIONING_PROFILE_SPECIFIER = Enforcer App Store Profile
+          FLUTTER_BUILD_NUMBER = ${{ env.BUILD_NUMBER }}
+          FLUTTER_BUILD_NAME = ${{ env.VERSION }}
+          EOF
+
+          # Archive — signing flags come from xcconfig, not command line,
+          # so they are scoped to Runner only and do not leak into Pod targets
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath build/ios/archive/Runner.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution: TECHBIZ LIMITED (45XP48S67P)" \
-            PROVISIONING_PROFILE_SPECIFIER="Enforcer App Store Profile" \
-            DEVELOPMENT_TEAM=45XP48S67P \
+            -xcconfig /tmp/signing_override.xcconfig \
             OTHER_CODE_SIGN_FLAGS="--keychain build.keychain" \
-            FLUTTER_BUILD_NUMBER=${{ env.BUILD_NUMBER }} \
-            FLUTTER_BUILD_NAME=${{ env.VERSION }}
+            archive
 
           # Export archive to IPA using ExportOptions.plist
           xcodebuild \
