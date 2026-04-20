@@ -60,6 +60,12 @@ jobs:
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
           sed -i '' '/showTrackOnHover/d' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
+          sed -i '' '/hoverThickness/d' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
+          sed -i '' '/hoverThickness/d' \
+            "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
+          sed -i '' 's/final ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context);/final ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context) as ValueNotifier<bool>;/' \
+            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
 
           echo "✅ Pub cache patches applied"
 
