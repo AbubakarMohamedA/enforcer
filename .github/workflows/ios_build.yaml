@@ -38,6 +38,7 @@ jobs:
       - name: Install CocoaPods
         run: |
           cd ios
+          rm -f Podfile.lock
           pod install --repo-update
 
       # 6. Extract version info from pubspec.yaml
@@ -68,6 +69,13 @@ jobs:
 
           # Decode and import the .p12 distribution certificate
           echo "$CERTIFICATE_BASE64" | base64 --decode > certificate.p12
+
+          # Verify the decoded file is a valid p12
+          echo "Certificate file size: $(stat -f%z certificate.p12 2>/dev/null || stat -c%s certificate.p12) bytes"
+          openssl pkcs12 -in certificate.p12 -noout -passin pass:"$CERTIFICATE_PASSWORD" 2>&1 && \
+            echo "✅ Certificate is valid" || echo "❌ Certificate is invalid or password is wrong"
+
+
           security import certificate.p12 \
             -k build.keychain \
             -P "$CERTIFICATE_PASSWORD" \
@@ -75,6 +83,10 @@ jobs:
           security set-key-partition-list \
             -S apple-tool:,apple: \
             -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+          # Verify certificate was imported
+          echo "Certificates in keychain:"
+          security find-identity -v -p codesigning build.keychain
 
       # 8. Install provisioning profile
       - name: Install Provisioning Profile
