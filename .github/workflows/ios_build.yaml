@@ -66,7 +66,7 @@ jobs:
           sed -i '' 's/ValueListenable<bool> newNotifier = TickerMode.getNotifier(context)/ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context) as ValueNotifier<bool>/g' \
             "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
           sed -i '' 's/ValueListenable<bool>? _tickerModeNotifier/ValueNotifier<bool>? _tickerModeNotifier/g' \
-            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixi
+            "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
           echo "✅ Pub cache patches applied"
 
       # 5. Install CocoaPods dependencies
