@@ -12,7 +12,7 @@ jobs:
     steps:
       # 1. Checkout code
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2. Read Flutter version from .flutter-version file
       - name: Read Flutter version
@@ -35,7 +35,8 @@ jobs:
       # 4.5. Patch incompatible pub cache packages
       # Replicates local pub cache fixes so CI doesn't need source code changes.
       # dropdown_search 3.0.1 uses deprecated TextTheme getters removed in Flutter 3.x,
-      # isAlwaysShown renamed to thumbVisibility, and showTrackOnHover removed from Scrollbar.
+      # isAlwaysShown renamed to thumbVisibility, showTrackOnHover and hoverThickness
+      # removed from Scrollbar.
       # simple_animations 4.2.0 has a ValueListenable/ValueNotifier type mismatch
       # due to a Flutter SDK change in TickerMode.getNotifier return type.
       - name: Patch pub cache packages
@@ -60,10 +61,14 @@ jobs:
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
           sed -i '' '/showTrackOnHover/d' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
+          # Remove hoverThickness — no longer a valid Scrollbar parameter
           sed -i '' '/hoverThickness/d' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/selection_widget.dart"
           sed -i '' '/hoverThickness/d' \
             "$PUB_CACHE/dropdown_search-3.0.1/lib/src/properties/scrollbar_props.dart"
+
+          # --- simple_animations 4.2.0 ---
+          # TickerMode.getNotifier now returns ValueListenable<bool>, not ValueNotifier<bool>
           sed -i '' 's/final ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context);/final ValueNotifier<bool> newNotifier = TickerMode.getNotifier(context) as ValueNotifier<bool>;/' \
             "$PUB_CACHE/simple_animations-4.2.0/lib/anicoto/animation_mixin.dart"
 
@@ -173,21 +178,13 @@ jobs:
       # 10. Save IPA as artifact
       - name: Upload IPA artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: app-release-${{ env.VERSION }}-${{ env.BUILD_NUMBER }}.ipa
           path: build/ios/ipa/*.ipa
           retention-days: 7
 
-      # 11. Install Apple Transporter
-      - name: Install Apple Transporter
-        run: |
-          curl -O https://itmstransporter.itunes.apple.com/downloads/Transporter-latest.dmg
-          hdiutil attach Transporter-latest.dmg -quiet
-          cp -R "/Volumes/Transporter/Transporter.app" /Applications/
-          hdiutil detach "/Volumes/Transporter" -quiet
-
-      # 12. Upload to App Store Connect via Transporter CLI
+      # 11. Upload to App Store Connect via xcrun altool (no Transporter download needed)
       - name: Upload to App Store Connect
         env:
           APP_STORE_API_KEY_ID: ${{ secrets.APP_STORE_API_KEY_ID }}
@@ -208,14 +205,13 @@ jobs:
           echo "Detected bundle ID: $BUNDLE_ID"
           echo "Uploading version $VERSION build $BUILD_NUMBER"
 
-          /Applications/Transporter.app/Contents/itms/bin/iTMSTransporter \
-            -m upload \
-            -f build/ios/ipa/*.ipa \
-            -apiKey "$APP_STORE_API_KEY_ID" \
-            -apiIssuer "$APP_STORE_ISSUER_ID" \
-            -v detailed
+          xcrun altool --upload-app \
+            --type ios \
+            --file build/ios/ipa/*.ipa \
+            --apiKey "$APP_STORE_API_KEY_ID" \
+            --apiIssuer "$APP_STORE_ISSUER_ID"
 
-      # 13. Cleanup keychain
+      # 12. Cleanup keychain
       - name: Cleanup keychain
         if: always()
         run: |
