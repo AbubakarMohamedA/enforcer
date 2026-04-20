@@ -34,15 +34,32 @@ jobs:
       - name: Install Flutter dependencies
         run: flutter pub get
 
-      # 5. Install CocoaPods dependencies
+      # 5. Install CocoaPods dependencies and disable Pod target signing
       # Podfile.lock is deleted before install because it pins an older Firebase
       # version that conflicts with the current flutter plugin requirements.
       # --repo-update refreshes the spec repo so the latest versions are resolved.
+      #
+      # After pod install, we patch Pods.xcodeproj/project.pbxproj to clear
+      # PROVISIONING_PROFILE_SPECIFIER and CODE_SIGN_IDENTITY on every Pod target.
+      # Without this patch, xcodebuild leaks the Runner's signing settings into
+      # all Pod targets (Firebase, gRPC, etc.) which don't support provisioning
+      # profiles, causing archive to fail with exit code 65.
+      # pod install regenerates this file on every run so the patch is always fresh.
       - name: Install CocoaPods
         run: |
           cd ios
           rm -f Podfile.lock
           pod install --repo-update
+
+          # Patch all Pod targets to have no provisioning profile or signing identity
+          find Pods/Pods.xcodeproj -name "*.pbxproj" | xargs sed -i '' \
+            's/PROVISIONING_PROFILE_SPECIFIER = .*/PROVISIONING_PROFILE_SPECIFIER = "";/g'
+          find Pods/Pods.xcodeproj -name "*.pbxproj" | xargs sed -i '' \
+            's/CODE_SIGN_STYLE = .*/CODE_SIGN_STYLE = Automatic;/g'
+          find Pods/Pods.xcodeproj -name "*.pbxproj" | xargs sed -i '' \
+            's/CODE_SIGN_IDENTITY = .*/CODE_SIGN_IDENTITY = "";/g'
+
+          echo "Pod target signing cleared successfully"
 
       # 6. Extract version info from pubspec.yaml
       - name: Extract version info
@@ -115,8 +132,9 @@ jobs:
       # Calls xcodebuild directly instead of flutter build ios/ipa to avoid
       # Flutter's project migration phase which resets signing settings on every
       # run. CocoaPods was already run in step 5, so the workspace is ready.
-      # Signing flags passed at the xcodebuild command line always override
-      # whatever is written in project.pbxproj.
+      # Pod target signing was cleared in step 5, so only Runner gets signed.
+      # The -destination flag forces iOS device target so xcodebuild does not
+      # pick "My Mac (Designed for iPad)" as the default destination.
       - name: Build IPA
         env:
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
@@ -126,12 +144,13 @@ jobs:
           security default-keychain -s build.keychain
           security list-keychains -d user -s build.keychain login.keychain
 
-          # Archive directly with xcodebuild — bypasses Flutter's migration
-          # which was resetting signing settings on every run.
+          # Archive with signing scoped to Runner only — Pod targets were
+          # patched to Automatic/empty in step 5 so they are never signed
           xcodebuild \
             -workspace ios/Runner.xcworkspace \
             -scheme Runner \
             -configuration Release \
+            -destination 'generic/platform=iOS' \
             -archivePath build/ios/archive/Runner.xcarchive \
             archive \
             CODE_SIGN_STYLE=Manual \
