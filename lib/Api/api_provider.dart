@@ -43,63 +43,51 @@ class ApiProvider {
     print("The pass is $password");
 
     try {
-      final payload = {
-        'appType': 'login',
+      FormData formData = FormData.fromMap({
         'email': email,
         'password': password,
-      };
+      });
 
-      print("The Login Payload is: $payload");
+      print("The form data is ${formData.fields}");
 
       result = await Dio().post(
-        Endpoints.MARKET_URL,
+        "https://eportal.mombasa.go.ke/mobile/android/staff/loginV2.php",
+        // Endpoints.LOGIN_URL, // Replace with your actual endpoint
         options: Options(
           preserveHeaderCase: true,
           headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'ngrok-skip-browser-warning': 'true', // Bypass ngrok warning page
-          },
+            'Content-Type': 'application/json', // Set content type to JSON
+            },
         ),
-        data: payload,
-      );
+        data: formData,
+        );
 
-      print("The RESULT IS: ${result.data}");
+      print("The RESULT IS: ${jsonEncode(result.data)}");
 
       if (kDebugMode) {
         print('The Login result is $result');
-        print('The result status is ${result.statusCode}');
-      }
-
-      if (result.statusCode != 200) {
-        throw Exception('Server returned ${result.statusCode}');
-      }
-
-      // Dio automatically decodes JSON if the response header is application/json
-      if (result.data is Map<String, dynamic>) {
-        return result.data;
-      } else if (result.data is String) {
-        return jsonDecode(result.data);
-      } else {
-        throw Exception('Unexpected response format');
-      }
+        print('The result is ${result.statusCode}');
+        }
+      if (result.statusCode != 200) throw Exception();
+      return jsonDecode(result.data);
     } on SocketException {
-      throw const SocketException('Bad Internet Connection');
-    } on FormatException catch (e) {
-      throw FormatException('Invalid Server Response: $e');
-    } on DioException catch (e) {
+      throw const SocketException('Bad Internet');
+      } on FormatException catch (e) {
+      throw FormatException(e.toString());
+    } on DioError catch (e) {
       if (e.error is SocketException) {
-        throw Exception('Connection error. Please check your internet.');
-      } else if (e.response != null) {
-        final data = e.response!.data;
-        final message = (data is Map) ? data['message'] : 'Server error: ${e.response!.statusCode}';
-        throw Exception(message);
-      } else {
-        throw Exception('Connection failed: ${e.message}');
-      }
-    } catch (e) {
-      throw Exception(e.toString());
-    }
+        print('SocketException: ${e.error}');
+        throw Exception('Connection error');
+        } else {
+        print('DioError: $e');
+        if (e.response != null) {
+          print('DioError Response: ${e.response!.statusCode}, ${e.response!.data}');
+          throw Exception(e.response!.data['message']);
+        } else {
+          throw Exception('Unknown error');
+        }
+        }
+        }
   }
 
   // CHANGE PASSWORD
