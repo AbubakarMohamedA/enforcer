@@ -147,15 +147,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         height: screenHeight * 0.356,
                         child: Stack(
                           children: [
-                            // _drawCircles(),
-                            // Positioned(
-                            //   top: 0,
-                            //   right: 0,
-                            //   child: Image.asset(
-                            //       "assets/images/top1.png",
-                            //       width: size.width
-                            //   ),
-                            // ),
                             Positioned(
                               top: 0,
                               right: 0,
@@ -306,7 +297,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   color: Colors.black.withOpacity(0.2),
                   spreadRadius: 1,
                   blurRadius: 5,
-                  offset: Offset(0, 5), // changes position of shadow
+                  offset: Offset(0, 5),
                 ),
               ],
               borderRadius: BorderRadius.circular(8.0),
@@ -334,24 +325,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         },
                       );
                     } else {
-                      // CONFIRM THE USERNAME RETURNED
-                      // String fullName = loginResult['user']['full_name'];
-                      // String fullName = "Abdul Jibril";
-                      // List<String> nameParts = fullName!.split(' ');
-                      // String firstName = nameParts[0];
-                      // String lastName = nameParts[1];
-                      // SharedPreferences prefs = await SharedPreferences.getInstance();
-                      // await prefs.setString(_token, loginResult['token'] ?? '');
-                      // await prefs.setString(_kId, loginResult['user']['staff_id'].toString() ?? '');
-                      // await prefs.setString(_firstName, loginResult['user']['firstname'].toString() ?? '');
-                      // await prefs.setString(_lastName,loginResult['user']['lastname'].toString() ?? '');
-                      // await prefs.setString(_kemail, loginResult['user']['email'] ?? '');
-                      // await prefs.setString(_kmobile, loginResult['user']['mobile'] ?? '');
                       await saveUserDataToPreferences(loginResult);
-                      // Navigator.push(
-                      //   context,
-                      //   MaterialPageRoute(builder: (c) => Dashboard()),
-                      // );
                       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => AppDrawer(child:Dashboard()),),);
                     }
                   } catch (e) {
@@ -373,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
               style: ButtonStyle(
                 shape: MaterialStateProperty.all<RoundedRectangleBorder>(
                   RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.0), // Set circular border radius
+                    borderRadius: BorderRadius.circular(8.0),
                   ),
                 ),
                 backgroundColor: MaterialStateProperty.all<Color>(Color(0xFFFFCC2A)),
@@ -397,7 +371,40 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             ),
           ),
           const SizedBox(height: 24),
+
+          // ── Powered by 47PRO footer ──────────────────────────────────────
+          _buildPoweredByFooter(fontSize),
+          const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  /// "Powered by Techbiz Limited" footer widget
+  Widget _buildPoweredByFooter(double fontSize) {
+    return Container(
+      
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 17.0),
+      child: RichText(
+      text: TextSpan(
+        style: GoogleFonts.manrope(
+          fontSize: fontSize * 0.9,
+          fontWeight: FontWeight.w500,
+          color: Colors.black87,
+        ),
+        children: [
+          TextSpan(text: 'Powered by : '),
+          TextSpan(
+            text: 'Techbiz Limited',
+            style: GoogleFonts.manrope(
+              fontSize: fontSize * 0.9,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF2196F3),
+            ),
+          ),
+        ],
+      ),
       ),
     );
   }
@@ -423,7 +430,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       margin: EdgeInsets.only(left: 16.0, right: 16),
       borderRadius: 10.0,
     );
-    /// Update the UserData class fields
 
     userData.token = loginResult['token'].toString() ?? '';
     userData.userId= loginResult['user']['idno'].toString() ?? '';
@@ -431,7 +437,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     userData.firstName = "${loginResult['user']['firstname'].toString()} ${loginResult['user']['lastname'].toString()}" ?? '';
     userData.lastName = "${loginResult['user']['lastname'].toString()} ${loginResult['user']['lastname'].toString()}" ?? '';
     userData.mobile = loginResult['user']['mobile'].toString() ?? '';
-
 
     print("User data saved and updated in UserData class.");
   }
